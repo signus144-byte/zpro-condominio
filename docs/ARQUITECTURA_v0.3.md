@@ -1,4 +1,4 @@
-# ZPro Condominio · Arquitectura v0.4 (servidor propio)
+# ZPro Condominio · Arquitectura v0.5 (servidor propio)
 
 *27-oct-2026 · Technical Digital TD, C.A. · Reemplaza a la v0.2 en todo lo relativo al servidor. v0.4: decisiones comerciales de Dirección (§6).*
 
@@ -54,7 +54,7 @@ A diferencia del plan anterior (Supabase), **el chat en tiempo real sí cabe en 
 
 ## 4. Pruebas
 
-- **106 pruebas de la API** + reglas SQL, todas contra **PostgreSQL 18 real** (cuentas, sesiones, permisos de cada rol, finanzas, conciliación, votaciones, reportes anónimos, documentos, chat, WebSocket con clientes reales, tareas, webhook, consola).
+- **128 pruebas de la API** + reglas SQL, todas contra **PostgreSQL 18 real** (cuentas, sesiones, permisos de cada rol, finanzas, conciliación, votaciones, reportes anónimos, documentos, chat, WebSocket con clientes reales, tareas, webhook, consola).
 - **Recorrido de punta a punta** con el servidor compilado como en producción: inicio de sesión real, chat en tiempo real entre una residente y la presidenta, pago reportado y confirmado, consola master. Sin errores.
 - Docker no se pudo ejecutar en el entorno de desarrollo (sin acceso a Docker Hub); los archivos están listos y se prueban en su PC con `docker compose up --build`.
 
@@ -78,3 +78,16 @@ A diferencia del plan anterior (Supabase), **el chat en tiempo real sí cabe en 
 | **Bancos** | No importa qué banco use cada condominio | El flujo base es: la casa sube su comprobante (captura del Pago Móvil, voucher) → la junta concilia en su banco → **aprueba o rechaza** (con motivo) → la casa recibe el aviso y las finanzas se actualizan solas. La conciliación por extracto y el webhook quedan como ayudas opcionales |
 | **Recordatorio** | Siempre visible mientras haya pagos sin revisar | Aviso fijo en la pantalla de la junta + notificación cada mañana (8:00) con cuántos pagos esperan y desde cuándo, también por correo |
 | **Nombre de la app** | Por decidir | Se mantiene "ZPro Condominio" y `com.zentapro.condominio` como provisionales. No se firma ninguna versión hasta tener el nombre definitivo y la cuenta de Google Play aprobada |
+
+## 7. Alerta vecinal y dos apps (v0.5, 28-oct-2026)
+
+| Tema | Cómo quedó |
+|---|---|
+| **Botón SOS** | 4 botones: Seguridad, Emergencia médica, Incendio, Otra emergencia (los tipos más usados en apps de alerta vecinal). Nota corta opcional |
+| **Identidad y responsabilidad** | En el teléfono: huella, rostro o, si no, patrón/PIN del teléfono. En la web: la clave de la cuenta (la verifica el servidor). La alerta lleva nombre y casa; nada es anónimo |
+| **A quién avisa** | Vecinos inscritos de las casas cercanas (mismo bloque o calle, N posiciones a cada lado; la junta fija N y puede ajustar la cercanía casa por casa), la familia de la misma casa y la junta. Incendio: a todo el condominio. Se puede "ampliar" |
+| **Cómo suena** | App abierta: pantalla roja con sirena en bucle y vibración. App cerrada: notificación push en el canal Android "Alerta vecinal" con sonido de alarma y máxima prioridad (requiere Firebase) |
+| **Ayuda** | Respuestas "Voy en camino", "Tengo vehículo", "Llamé a las autoridades", "No puedo". Quien pidió ayuda ve quién viene, con su casa, vehículo, si es personal de salud y botón para llamar. El teléfono solo se ve dentro de una alerta |
+| **Contra el abuso** | Participación voluntaria; una alerta activa a la vez; 3 por día; la junta ve falsas alarmas por persona y puede suspender; cierre automático a las 3 h; todo queda registrado |
+| **Dos apps** | ZPro Admin (junta) y ZPro Miembros (vecinos): mismo código, dos sabores de Android, íconos distintos. Admin comparte un enlace de invitación (QR/WhatsApp); el vecino elige su casa y la junta aprueba |
+| **Compilación** | Proyecto Android en `app/android` (Capacitor 8, targetSdk 36). APK de prueba con `app/compilar_apk.ps1` en la PC o en GitHub Actions. Release oficial solo con nombre definitivo y llave oficial |

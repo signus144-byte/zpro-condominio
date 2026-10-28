@@ -1,5 +1,17 @@
 # Historial de versiones · ZPro Condominio
 
+## 0.5 · 28-oct-2026 · Alerta vecinal y dos apps (Admin y Miembros)
+- **Alerta vecinal (botón SOS)**: 4 botones grandes (Seguridad, Emergencia médica, Incendio, Otra emergencia). Quien avisa confirma que es el dueño del teléfono con huella, rostro, patrón o PIN (en la web, con su clave) y la alerta sale con su nombre y su casa.
+  - Avisa a las casas cercanas inscritas (por defecto 3 a cada lado: si avisa la 28, suenan de la 25 a la 31), a la familia de la misma casa y a la junta. Incendio avisa a todo el condominio; cualquier alerta se puede ampliar.
+  - Los teléfonos suenan como alarma (sirena y vibración) con la app abierta; con la app cerrada, cuando se configure Firebase.
+  - Los vecinos responden: "Voy en camino", "Tengo vehículo disponible", "Llamé a las autoridades" o "No puedo"; quien pidió ayuda ve quién viene, su casa, si tiene vehículo o es personal de salud, y puede llamarlo.
+  - Participar es voluntario. Contra el abuso: una alerta activa a la vez, máximo 3 por día, la junta marca falsas alarmas y puede suspender; las alertas olvidadas se cierran solas a las 3 horas.
+  - La junta activa la red, fija el radio y ajusta la cercanía de las casas (calle/bloque y posición).
+- **Dos apps desde el mismo código**: ZPro Admin (junta) y ZPro Miembros (vecinos), con íconos distintos. La de administración comparte un **enlace de invitación** (QR, WhatsApp) para que cada vecino entre eligiendo su casa; la junta aprueba y recibe aviso de cada solicitud.
+- Las APK de prueba pueden conectarse a un servidor de la red local o funcionar en modo demostración.
+- Proyecto Android con los dos sabores, canal "Alerta vecinal" con sonido de alarma, script `app/compilar_apk.ps1` y compilación en GitHub (`.github/workflows/apk-prueba.yml`).
+- 128 pruebas de la API + reglas SQL, todas pasan.
+
 ## 0.4 · 27-oct-2026 · Decisiones comerciales de Dirección
 - **Cobro de ZentaPro solo en bolívares**, a la tasa BCV del día del pago: abonos parciales, cada uno convertido con la tasa de su día; la base de datos rechaza pagos en dólares. ZentaPro puede rechazar un pago reportado con motivo.
 - **Planes por tamaño con precio global**: Pequeño (hasta 50 unidades) $40, Mediano (hasta 150) $70, Grande (hasta 300) $110, Extra grande $150. Se asignan solos según las unidades; precio especial por condominio; editables en la consola ("Planes y precios").

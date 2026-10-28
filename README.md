@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Qué es** | Administración de condominios: columna financiera para Presidencia, app para residentes con chat por casa, y consola master de ZentaPro |
-| **Paquete (applicationId)** | `com.zentapro.condominio` ⚠ *provisional, confirmar antes de la primera versión firmada* |
+| **Paquetes (applicationId)** | ZPro Admin `com.zentapro.condominio.admin` · ZPro Miembros `com.zentapro.condominio` ⚠ *provisionales: el nombre de la app está por decidir* |
 | **Desarrollador** | Technical Digital TD, C.A. (ZentaPro) · soporte@zentapro.com |
-| **Versión** | 0.4 · servidor propio, todo en Docker local · cobro solo en Bs, planes por tamaño, chat entre vecinos opcional, notificaciones de pagos |
+| **Versión** | 0.5 · servidor propio en Docker local · alerta vecinal · dos apps: ZPro Admin (junta) y ZPro Miembros (vecinos) |
 | **Estado** | Funciona de punta a punta en local. Aún no publicado ni instalado en DigitalOcean |
 
 ## Cómo correrlo en su PC
@@ -33,8 +33,8 @@ Para apagar: `Ctrl+C` o `docker compose down`. Los datos quedan guardados; para 
 | Carpeta | Contenido |
 |---|---|
 | `servidor/` | **Servidor propio** (Node.js + TypeScript + PostgreSQL 18): API, inicio de sesión, archivos, chat en tiempo real, notificaciones, tareas programadas. Ver `servidor/CONTRATO_API.md` |
-| `servidor/db/migraciones/` | Base de datos: 19 archivos SQL con tablas, reglas y seguridad por filas. Se aplican solos al arrancar |
-| `servidor/pruebas/` | 106 pruebas de la API + pruebas de reglas SQL, contra PostgreSQL real |
+| `servidor/db/migraciones/` | Base de datos: 21 archivos SQL con tablas, reglas y seguridad por filas. Se aplican solos al arrancar |
+| `servidor/pruebas/` | 128 pruebas de la API + pruebas de reglas SQL, contra PostgreSQL real |
 | `app/` | App de residentes y junta (React + Capacitor: Android, iOS y web) |
 | `consola/` | Consola master de ZentaPro (web aparte) |
 | `compartido/` | Tipos de datos comunes a app, consola y servidor |
@@ -52,19 +52,27 @@ Sin `VITE_API_URL`, la app y la consola arrancan en **modo demostración** (dato
 ```powershell
 cd servidor
 npm install
-npm test          # 106 pruebas de la API (levanta un PostgreSQL temporal solo)
+npm test          # 128 pruebas de la API (levanta un PostgreSQL temporal solo)
 npm run test:sql  # reglas de la base de datos
 ```
 
-## APK de Android
+## APK de Android (dos apps: ZPro Admin y ZPro Miembros)
 
+Las dos salen del mismo código (`app/`) como dos "sabores" de Android con paquetes, nombres e íconos distintos.
+
+**APK de prueba** (para ver en el teléfono; paquete con `.prueba` y llave SOLO de prueba en `_firma\llaves\condominio-prueba\`):
 ```powershell
-cd app
-npm install
-npx cap add android      # solo la primera vez
-npm run android          # compila, copia a Android y abre Android Studio
+cd "C:\Users\signu\ZENTAPRO APP\condominio\app"
+powershell -ExecutionPolicy Bypass -File .\compilar_apk.ps1          # necesita Android Studio y Node.js 22
 ```
-Firmar con la llave propia de la app (`..\_firma\crear_llave_firma.ps1 -AppId condominio`). Nunca distribuir builds de depuración.
+Quedan en `releases\v0.5-prueba\` con sus huellas SHA-256. También se pueden compilar en GitHub (Actions → "APK de prueba").
+
+- Sin servidor, las apps abren en **modo demostración**. Para usarlas con el Docker de su PC: vea el comentario al inicio de
+  `docker-compose.yml` y en la app toque "Conectar a un servidor" → `http://IP-DE-SU-PC:3000`.
+- La alarma de la alerta vecinal suena con la app abierta. Para que suene con la app cerrada hace falta Firebase (gratis):
+  poner `google-services.json` en `app/android/app/` y `FCM_CUENTA_SERVICIO` en el servidor.
+- Las versiones oficiales se firman con la llave de la app (`android/keystore.properties`) cuando esté decidido el nombre
+  y aprobada la cuenta de Google. Nunca distribuir builds de depuración.
 
 ## Documentos
 
