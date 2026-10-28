@@ -1,0 +1,77 @@
+# ZPro Condominio · PRODUCCIÓN en un Droplet (piloto: 1 GB de RAM).
+# En el Droplet:  cp produccion.env.example .env  (y completar)  →  docker compose -f docker-compose.prod.yml up -d --build
+name: zpro-condominio
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zpro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_CLAVE:?falta POSTGRES_CLAVE}
+    # Ajustado para 1 GB de RAM compartido con el servidor y Caddy.
+    command: >
+      postgres -c shared_buffers=128MB -c effective_cache_size=384MB -c work_mem=4MB
+               -c maintenance_work_mem=32MB -c max_connections=40 -c wal_buffers=4MB
+    volumes:
+      - zpro_db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zpro"]
+      interval: 10s
+      retries: 10
+    mem_limit: 400m
+
+  servidor:
+    build:
+      context: ../..
+      dockerfile: servidor/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://zpro_api:${API_CLAVE_BD:?falta API_CLAVE_BD}@db:5432/zpro
+      DATABASE_ADMIN_URL: postgres://postgres:${POSTGRES_CLAVE}@db:5432/zpro
+      JWT_SECRETO: ${JWT_SECRETO:?falta JWT_SECRETO}
+      ARCHIVOS_DIR: /datos/archivos
+      URL_PUBLICA: https://${DOMINIO_APP}
+      URL_APP: https://${DOMINIO_APP}
+      CORS_ORIGENES: https://${DOMINIO_APP},https://${DOMINIO_CONSOLA},capacitor://localhost,https://localhost
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PUERTO: ${SMTP_PUERTO:-587}
+      SMTP_USUARIO: ${SMTP_USUARIO}
+      SMTP_CLAVE: ${SMTP_CLAVE}
+      CORREO_REMITENTE: ${CORREO_REMITENTE}
+      FCM_CUENTA_SERVICIO: ${FCM_CUENTA_SERVICIO:-}
+      SECRETOS_BANCOS: ${SECRETOS_BANCOS:-{}}
+      DATOS_PAGO_ZENTAPRO: ${DATOS_PAGO_ZENTAPRO:-}
+      NODE_OPTIONS: --max-old-space-size=256
+    volumes:
+      - zpro_archivos:/datos/archivos
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 350m
+
+  caddy:
+    build:
+      context: ../..
+      dockerfile: despliegue/digitalocean/caddy.Dockerfile
+      args:
+        VITE_API_URL: https://${DOMINIO_APP}
+    restart: unless-stopped
+    environment:
+      DOMINIO_APP: ${DOMINIO_APP}
+      DOMINIO_CONSOLA: ${DOMINIO_CONSOLA}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_datos:/data
+    depends_on:
+      - servidor
+    mem_limit: 100m
+
+volumes:
+  zpro_db:
+  zpro_archivos:
+  caddy_datos:

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+android/app/release/
+*.p12
+*.jks
+*.keystore
+tsconfig.tsbuildinfo
+
+# Ediciones de la app para Android (las genera scripts/preparar_android.mjs)
+dist-admin/
+dist-miembros/

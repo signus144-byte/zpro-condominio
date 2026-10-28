@@ -1,0 +1,21 @@
+.casas-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+.casa-chk { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; border: 1px solid var(--linea);
+  border-radius: 10px; font-size: 0.85rem; cursor: pointer; background: var(--superficie); }
+.casa-chk input { width: 14px; height: 14px; accent-color: var(--primario); }
+.casa-chk.activa { border-color: var(--primario); background: var(--primario-suave); color: var(--primario); font-weight: 650; }
+.codigo-grande { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1.25rem;
+  letter-spacing: 0.08em; color: var(--primario); margin: 2px 0; }
+.lista.codigos li { flex-wrap: wrap; }
+.lista-admin li.inactivo { opacity: 0.55; }
+.lista-admin select { padding: 6px 8px; width: auto; }
+.lista-admin li > .fila-botones { flex-wrap: nowrap; }
+@media (max-width: 420px) { .lista-admin li { flex-direction: column; align-items: stretch; } .lista-admin li > .fila-botones { flex-wrap: wrap; } }
+@media print {
+  body * { visibility: hidden; }
+  .imprimible, .imprimible * { visibility: visible; }
+  .imprimible { position: absolute; inset: 0; border: none; box-shadow: none; }
+  .no-imprimir { display: none !important; }
+  .lista.codigos li { break-inside: avoid; border-top: 1px dashed #999; padding: 14px 0; }
+}
+.lista.codigos li > .fila-botones { flex-wrap: nowrap; }
+.lista.codigos .fila-botones .btn { flex: 0 0 auto; padding: 8px 14px; }

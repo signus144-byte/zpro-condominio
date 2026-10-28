@@ -1,0 +1,124 @@
+apply plugin: 'com.android.application'
+
+// ZPro Condominio: una sola app, dos APK (sabores):
+//   admin    → "ZPro Admin"    (com.zentapro.condominio.admin)  para la junta
+//   miembros → "ZPro Miembros" (com.zentapro.condominio)        para los vecinos
+// Tipos de compilación:
+//   prueba  → para ver en el teléfono antes del lanzamiento. Paquete con sufijo ".prueba", firmado con una
+//             llave SOLO DE PRUEBA (keystore-prueba.properties). No es una build de depuración, pero tampoco se reparte.
+//   release → la oficial, firmada con la llave de la app (keystore.properties). Paquetes PROVISIONALES:
+//             confirmar el nombre de la app antes de la primera release.
+def leerPropiedades(nombre) {
+    def f = rootProject.file(nombre)
+    def p = new Properties()
+    if (f.exists()) { f.withInputStream { p.load(it) } }
+    return p
+}
+def firmaPrueba = leerPropiedades('keystore-prueba.properties')
+def firmaOficial = leerPropiedades('keystore.properties')
+
+android {
+    namespace = "com.zentapro.condominio"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.zentapro.condominio"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 5
+        versionName "0.5"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        if (firmaPrueba['storeFile']) {
+            prueba {
+                storeFile file(firmaPrueba['storeFile'])
+                if (firmaPrueba['storeType']) { storeType firmaPrueba['storeType'] }
+                storePassword firmaPrueba['storePassword']
+                keyAlias firmaPrueba['keyAlias']
+                keyPassword firmaPrueba['keyPassword']
+            }
+        }
+        if (firmaOficial['storeFile']) {
+            oficial {
+                storeFile file(firmaOficial['storeFile'])
+                if (firmaOficial['storeType']) { storeType firmaOficial['storeType'] }
+                storePassword firmaOficial['storePassword']
+                keyAlias firmaOficial['keyAlias']
+                keyPassword firmaOficial['keyPassword']
+            }
+        }
+    }
+
+    flavorDimensions = ['perfil']
+    productFlavors {
+        admin {
+            dimension 'perfil'
+            applicationId 'com.zentapro.condominio.admin'
+            resValue 'string', 'app_name', 'ZPro Admin'
+            resValue 'string', 'title_activity_main', 'ZPro Admin'
+        }
+        miembros {
+            dimension 'perfil'
+            applicationId 'com.zentapro.condominio'
+            resValue 'string', 'app_name', 'ZPro Miembros'
+            resValue 'string', 'title_activity_main', 'ZPro Miembros'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            manifestPlaceholders = [textoClaro: 'false']
+            if (firmaOficial['storeFile']) { signingConfig signingConfigs.oficial }
+        }
+        prueba {
+            initWith release
+            applicationIdSuffix '.prueba'
+            versionNameSuffix '-prueba'
+            debuggable false
+            // Permite conectar el teléfono a un servidor de prueba en la red local (http://192.168.x.x).
+            manifestPlaceholders = [textoClaro: 'true']
+            matchingFallbacks = ['release']
+            // Nunca con la llave oficial: si no hay llave de prueba, sale sin firmar (el script la crea).
+            signingConfig = firmaPrueba['storeFile'] ? signingConfigs.prueba : null
+        }
+        debug {
+            manifestPlaceholders = [textoClaro: 'true']
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

@@ -1,0 +1,43 @@
+{
+  "name": "zpro-condominio-servidor",
+  "private": true,
+  "version": "0.5.0",
+  "type": "module",
+  "description": "Servidor propio de ZPro Condominio: API REST + tiempo real + tareas programadas (Technical Digital TD, C.A.)",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/servidor/src/index.js",
+    "build": "tsc -p tsconfig.build.json && node -e \"require('node:fs').cpSync('db','dist/servidor/db',{recursive:true})\"",
+    "typecheck": "tsc --noEmit",
+    "migrar": "tsx src/db/migrar.ts",
+    "migrar:demo": "tsx src/db/migrar.ts --demo",
+    "test": "node --import tsx --test --test-concurrency=1 pruebas/*.test.ts",
+    "test:sql": "node --import tsx --test --test-concurrency=1 pruebas/sql/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.1",
+    "@fastify/multipart": "^10.1.6",
+    "@fastify/rate-limit": "^11.2.1",
+    "@fastify/websocket": "^11.3.4",
+    "@node-rs/argon2": "^2.2.2",
+    "croner": "^11.0.0",
+    "fastify": "^5.12.7",
+    "jose": "^6.2.13",
+    "nodemailer": "^10.2.1",
+    "pg": "^8.23.1",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/nodemailer": "^8.0.2",
+    "@types/pg": "^8.23.1",
+    "@types/ws": "^8.18.2",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3"
+  }
+}

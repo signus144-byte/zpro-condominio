@@ -1,0 +1,11 @@
+# Local: app en :8080 y consola en :8081 (sin HTTPS). En producción ver despliegue/digitalocean/Caddyfile.
+:8080 {
+  root * /srv/app
+  try_files {path} /index.html
+  file_server
+}
+:8081 {
+  root * /srv/consola
+  try_files {path} /index.html
+  file_server
+}

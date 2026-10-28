@@ -1,0 +1,74 @@
+# ZPro Condominio · entorno LOCAL completo con Docker.
+#   docker compose up --build
+#   App:      http://localhost:8080   (elena@demo.zpro / demo-1234 · presidenta@demo.zpro / demo-1234)
+#   Consola:  http://localhost:8081   (soporte@demo.zpro / demo-1234)
+#   API:      http://localhost:3000/salud
+#   Correos:  http://localhost:8025   (todo lo que el sistema "envía" llega aquí, no sale a internet)
+#
+# Probar con las APK en el TELÉFONO (misma red Wi-Fi que la PC), en PowerShell:
+#   $env:ZPRO_ESCUCHA="0.0.0.0"; $env:ZPRO_URL_PUBLICA="http://IP-DE-SU-PC:3000"; docker compose up --build
+#   y en la app: "Conectar a un servidor" → http://IP-DE-SU-PC:3000   (la IP la da el comando ipconfig)
+name: zpro-condominio
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: zpro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_local
+    volumes:
+      - zpro_db:/var/lib/postgresql
+    ports:
+      - "127.0.0.1:5432:5432"          # para abrirla con DBeaver/pgAdmin desde su PC
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zpro"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  correo:
+    image: axllent/mailpit:latest
+    ports:
+      - "127.0.0.1:8025:8025"
+
+  servidor:
+    build:
+      context: .
+      dockerfile: servidor/Dockerfile
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://zpro_api:zpro_api_local@db:5432/zpro
+      DATABASE_ADMIN_URL: postgres://postgres:postgres_local@db:5432/zpro
+      JWT_SECRETO: desarrollo-local-cambiar-en-produccion-0123456789abcdef
+      ARCHIVOS_DIR: /datos/archivos
+      URL_PUBLICA: ${ZPRO_URL_PUBLICA:-http://localhost:3000}
+      URL_APP: http://localhost:8080
+      CORS_ORIGENES: http://localhost:8080,http://localhost:8081,http://localhost:5173,http://localhost:5174,capacitor://localhost,https://localhost
+      SMTP_HOST: correo
+      SMTP_PUERTO: "1025"
+      SEMILLA_DEMO: "si"
+      TAREAS_ACTIVAS: "si"
+    volumes:
+      - zpro_archivos:/datos/archivos
+    ports:
+      - "${ZPRO_ESCUCHA:-127.0.0.1}:3000:3000"   # 0.0.0.0 = visible para los teléfonos de su red
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: despliegue/web.Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      - servidor
+
+volumes:
+  zpro_db:
+  zpro_archivos:

@@ -1,0 +1,33 @@
+# Producción. La app y su API comparten dominio (sin problemas de CORS); la consola va en otro.
+{$DOMINIO_APP} {
+  encode gzip
+  handle /api/* {
+    reverse_proxy servidor:3000
+  }
+  handle /verificar/* {
+    reverse_proxy servidor:3000
+  }
+  handle {
+    root * /srv/app
+    try_files {path} /index.html
+    file_server
+  }
+  header {
+    Strict-Transport-Security "max-age=31536000"
+    X-Content-Type-Options nosniff
+    Referrer-Policy no-referrer
+    -Server
+  }
+}
+
+{$DOMINIO_CONSOLA} {
+  encode gzip
+  root * /srv/consola
+  try_files {path} /index.html
+  file_server
+  header {
+    Strict-Transport-Security "max-age=31536000"
+    X-Frame-Options DENY
+    -Server
+  }
+}

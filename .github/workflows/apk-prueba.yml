@@ -1,0 +1,54 @@
+# Compila las dos APK de PRUEBA (ZPro Admin y ZPro Miembros) en GitHub, sin instalar nada en la PC.
+# Se lanza a mano: pestaña Actions → "APK de prueba" → Run workflow. Las APK quedan como "artifact" para descargar.
+# Llave de prueba: si existen los secretos LLAVE_PRUEBA_P12_B64 y LLAVE_PRUEBA_CLAVE se usa esa (así cada APK
+# nueva actualiza a la anterior en el teléfono); si no, se crea una llave temporal en cada compilación.
+name: APK de prueba
+on:
+  workflow_dispatch:
+    inputs:
+      url_descarga:
+        description: 'Enlace para descargar ZPro Miembros (opcional, va en el mensaje de invitación)'
+        required: false
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: app/package-lock.json }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm ci
+      - name: Llave de prueba
+        env:
+          P12_B64: ${{ secrets.LLAVE_PRUEBA_P12_B64 }}
+          CLAVE: ${{ secrets.LLAVE_PRUEBA_CLAVE }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/llave"
+          if [ -n "$P12_B64" ]; then
+            echo "$P12_B64" | base64 -d > "$RUNNER_TEMP/llave/prueba.p12"
+          else
+            CLAVE=$(openssl rand -hex 16)
+            keytool -genkeypair -keystore "$RUNNER_TEMP/llave/prueba.p12" -storetype PKCS12 -alias condominio-prueba \
+              -keyalg RSA -keysize 2048 -validity 3650 -storepass "$CLAVE" -keypass "$CLAVE" \
+              -dname "CN=ZPro Condominio PRUEBA, O=TECHNICAL DIGITAL TD C.A., L=Caracas, C=VE"
+          fi
+          printf 'storeFile=%s\nstoreType=pkcs12\nstorePassword=%s\nkeyAlias=condominio-prueba\nkeyPassword=%s\n' \
+            "$RUNNER_TEMP/llave/prueba.p12" "$CLAVE" "$CLAVE" > android/keystore-prueba.properties
+      - run: node scripts/preparar_android.mjs --prueba
+        env:
+          URL_DESCARGA_MIEMBROS: ${{ github.event.inputs.url_descarga }}
+      - run: chmod +x android/gradlew && cd android && ./gradlew --no-daemon assembleAdminPrueba assembleMiembrosPrueba
+      - name: Renombrar y huellas
+        run: |
+          mkdir -p ../salida
+          cp android/app/build/outputs/apk/admin/prueba/app-admin-prueba.apk ../salida/ZPro-Admin-0.5-prueba.apk
+          cp android/app/build/outputs/apk/miembros/prueba/app-miembros-prueba.apk ../salida/ZPro-Miembros-0.5-prueba.apk
+          cd ../salida && sha256sum *.apk > SHA256.txt && cat SHA256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZPro-APK-0.5-prueba
+          path: salida/

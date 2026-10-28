@@ -1,0 +1,32 @@
+# Dependencias y compilados
+node_modules/
+dist/
+dist-admin/
+dist-miembros/
+*.tsbuildinfo
+.vite/
+
+# Secretos: NUNCA en git
+.env
+.env.*
+!.env.example
+!produccion.env.example
+*.p12
+*.jks
+keystore*.properties
+google-services.json
+
+# Android (generado)
+app/android/.gradle/
+app/android/build/
+app/android/app/build/
+app/android/local.properties
+app/android/app/src/main/assets/public/
+app/android/app/src/admin/assets/
+app/android/app/src/miembros/assets/
+*.apk
+*.aab
+
+# Entregas y datos locales
+releases/
+archivos/

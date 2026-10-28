@@ -1,0 +1,13 @@
+/* Pantalla de documentos (complementa estilos.css) */
+.doc-fila { display: flex; flex-wrap: wrap; gap: 8px; }
+.doc-boton { display: flex; flex-direction: column; gap: 4px; flex: 1 1 160px; min-width: 0; }
+.doc-boton .btn { width: 100%; justify-content: flex-start; text-align: left; }
+.doc-formato {
+  font-size: 0.66rem; font-weight: 800; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 4px;
+  background: rgba(255, 255, 255, 0.22); flex: none;
+}
+.btn-sec .doc-formato { background: var(--primario-suave); }
+.doc-ok { color: var(--ok); }
+.doc-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--linea); }
+.doc-item > div:first-child { display: flex; flex-direction: column; min-width: 0; }
+.doc-item .doc-boton { flex: 0 1 240px; }
