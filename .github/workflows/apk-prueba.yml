@@ -9,6 +9,8 @@ on:
       url_descarga:
         description: 'Enlace para descargar ZPro Miembros (opcional, va en el mensaje de invitación)'
         required: false
+permissions:
+  contents: write     # para publicar las APK como "Release" (prerelease) del repositorio
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -52,3 +54,23 @@ jobs:
         with:
           name: ZPro-APK-0.5-prueba
           path: salida/
+      - name: Publicar como Release de prueba (se descarga desde la pestaña Releases)
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ETIQUETA="v0.5-prueba-${{ github.run_number }}"
+          gh release create "$ETIQUETA" salida/*.apk salida/SHA256.txt --prerelease \
+            --title "ZPro Admin y ZPro Miembros 0.5 (prueba ${{ github.run_number }})" \
+            --notes "APK de PRUEBA (paquete .prueba, llave solo de prueba). No distribuir a clientes. Huellas SHA-256 en SHA256.txt."
+      - name: Guardar también en la rama "entregas" (copia descargable con git)
+        working-directory: .
+        run: |
+          git config user.name "ZPro CI"; git config user.email "soporte@zentapro.com"
+          git fetch origin entregas || true
+          git switch --orphan entregas-nueva
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          mkdir -p "prueba-${{ github.run_number }}" && cp salida/* "prueba-${{ github.run_number }}/"
+          git add "prueba-${{ github.run_number }}"
+          git commit -m "APK de prueba ${{ github.run_number }}"
+          git push -f origin HEAD:entregas
