@@ -1,6 +1,6 @@
 // Prepara el proyecto Android con las DOS ediciones de la app web:
-//   android/app/src/admin/assets/public     ← app compilada con VITE_SABOR=admin    (ZPro Admin)
-//   android/app/src/miembros/assets/public  ← app compilada con VITE_SABOR=miembros (ZPro Miembros)
+//   android/app/src/admin/assets/public     ← app compilada con VITE_SABOR=admin    (Vecinos ZPro Junta)
+//   android/app/src/miembros/assets/public  ← app compilada con VITE_SABOR=miembros (Vecinos ZPro)
 // Uso:  node scripts/preparar_android.mjs [--prueba]
 // Variables opcionales: URL_DESCARGA_MIEMBROS (enlace para bajar la APK de miembros, va en el mensaje de invitación)
 //                       API_URL (servidor fijo; si no, la app arranca en demostración y se conecta desde la pantalla de inicio)
@@ -13,7 +13,7 @@ const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const android = path.join(raiz, 'android');
 const prueba = process.argv.includes('--prueba');
 const conPush = existsSync(path.join(android, 'app', 'google-services.json'));
-const version = '0.5';
+const version = '0.5.1';
 
 const correr = (cmd, env = {}) => {
   console.log(`\n> ${cmd}`);

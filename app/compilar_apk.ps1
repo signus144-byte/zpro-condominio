@@ -1,13 +1,13 @@
 ﻿# =====================================================================
-# ZPro Condominio · Compilar las dos APK de PRUEBA (ZPro Admin y ZPro Miembros)
+# ZPro Condominio · Compilar las dos APK de PRUEBA (Vecinos ZPro Junta y Vecinos ZPro)
 #
 # Se ejecuta en su PC (Windows) con Android Studio instalado. No abre Android Studio ni toca la pantalla.
 #   1. Abra PowerShell en esta carpeta (ZENTAPRO APP\condominio\app)
 #   2. Ejecute:  powershell -ExecutionPolicy Bypass -File .\compilar_apk.ps1
 #      (opcional) -Instalar   → si hay un teléfono conectado por USB con "Depuración USB", las instala
-#      (opcional) -UrlDescarga "https://..."  → enlace para bajar ZPro Miembros (va en el mensaje de invitación)
+#      (opcional) -UrlDescarga "https://..."  → enlace para bajar Vecinos ZPro (va en el mensaje de invitación)
 #
-# Resultado: ..\releases\v0.5-prueba\ZPro-Admin-0.5-prueba.apk y ZPro-Miembros-0.5-prueba.apk (+ huellas SHA-256)
+# Resultado: ..\releases\v0.5-prueba\Vecinos-ZPro-Junta-0.5.1-prueba.apk y Vecinos-ZPro-0.5.1-prueba.apk (+ huellas SHA-256)
 #
 # Son APK de PRUEBA: paquete con ".prueba", firmadas con una llave SOLO DE PRUEBA (no la oficial).
 # Sirven para ver la app en sus teléfonos; no se reparten a clientes ni se suben a Google Play.
@@ -17,7 +17,7 @@ param(
   [string]$UrlDescarga = ""
 )
 $ErrorActionPreference = "Stop"
-$version = "0.5"
+$version = "0.5.1"
 $app = $PSScriptRoot
 $android = Join-Path $app "android"
 $condominio = Split-Path $app -Parent

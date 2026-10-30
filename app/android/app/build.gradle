@@ -1,8 +1,8 @@
 apply plugin: 'com.android.application'
 
 // ZPro Condominio: una sola app, dos APK (sabores):
-//   admin    → "ZPro Admin"    (com.zentapro.condominio.admin)  para la junta
-//   miembros → "ZPro Miembros" (com.zentapro.condominio)        para los vecinos
+//   admin    → "Vecinos ZPro Junta"    (com.zentapro.condominio.admin)  para la junta
+//   miembros → "Vecinos ZPro" (com.zentapro.condominio)        para los vecinos
 // Tipos de compilación:
 //   prueba  → para ver en el teléfono antes del lanzamiento. Paquete con sufijo ".prueba", firmado con una
 //             llave SOLO DE PRUEBA (keystore-prueba.properties). No es una build de depuración, pero tampoco se reparte.
@@ -24,8 +24,8 @@ android {
         applicationId "com.zentapro.condominio"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 5
-        versionName "0.5"
+        versionCode 6
+        versionName "0.5.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -59,14 +59,14 @@ android {
         admin {
             dimension 'perfil'
             applicationId 'com.zentapro.condominio.admin'
-            resValue 'string', 'app_name', 'ZPro Admin'
-            resValue 'string', 'title_activity_main', 'ZPro Admin'
+            resValue 'string', 'app_name', 'Vecinos ZPro Junta'
+            resValue 'string', 'title_activity_main', 'Vecinos ZPro Junta'
         }
         miembros {
             dimension 'perfil'
             applicationId 'com.zentapro.condominio'
-            resValue 'string', 'app_name', 'ZPro Miembros'
-            resValue 'string', 'title_activity_main', 'ZPro Miembros'
+            resValue 'string', 'app_name', 'Vecinos ZPro'
+            resValue 'string', 'title_activity_main', 'Vecinos ZPro'
         }
     }
 

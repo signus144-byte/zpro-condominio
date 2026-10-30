@@ -1,5 +1,5 @@
 // Invitar vecinos: la junta comparte UN enlace (WhatsApp, QR en la cartelera) para que cada vecino
-// descargue ZPro Miembros y pida entrar eligiendo su casa. La junta aprueba en Accesos → Solicitudes.
+// descargue Vecinos ZPro y pida entrar eligiendo su casa. La junta aprueba en Accesos → Solicitudes.
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import QRCode from 'qrcode';
@@ -10,8 +10,8 @@ import { URL_DESCARGA_MIEMBROS } from '../../sabor';
 import '../alerta/alerta.css';
 
 export function mensajeInvitacion(e: EnlaceInvitacion, condominio: string) {
-  return `Únase a ${condominio} en ZPro Miembros:\n`
-    + `1) Descargue la app${URL_DESCARGA_MIEMBROS ? `: ${URL_DESCARGA_MIEMBROS}` : ' ZPro Miembros'}\n`
+  return `Únase a ${condominio} en Vecinos ZPro:\n`
+    + `1) Descargue la app${URL_DESCARGA_MIEMBROS ? `: ${URL_DESCARGA_MIEMBROS}` : ' Vecinos ZPro'}\n`
     + `2) Abra este enlace o escriba el código ${e.codigo}: ${e.url}\n`
     + 'La junta aprobará su ingreso.';
 }

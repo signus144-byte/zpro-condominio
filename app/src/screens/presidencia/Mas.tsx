@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import '../chat/chat.css';
 
 const OPCIONES = [
-  { a: '/p/invitar', t: 'Invitar vecinos', d: 'Enlace y código QR para que cada vecino pida entrar con ZPro Miembros' },
+  { a: '/p/invitar', t: 'Invitar vecinos', d: 'Enlace y código QR para que cada vecino pida entrar con Vecinos ZPro' },
   { a: '/p/accesos', t: 'Accesos de vecinos', d: 'Códigos por casa, solicitudes por aprobar, miembros y roles' },
   { a: '/p/alerta', t: 'Alerta vecinal', d: 'Activar el botón SOS, casas a cada lado, vecinos inscritos y suspensiones' },
   { a: '/p/alertas', t: 'Historial de alertas', d: 'Emergencias recientes, quién respondió y cómo terminaron' },

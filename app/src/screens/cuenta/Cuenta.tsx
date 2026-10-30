@@ -8,12 +8,13 @@ import { destino, inicioDe } from '../../navegacion';
 import { NOMBRE_APP, SABOR, VERSION } from '../../sabor';
 import { fecha } from '../../formato';
 import './cuenta.css';
+import { FONDO_LOGO, SimboloMarca } from '../../components/Logo';
 
 function Portada({ titulo, subtitulo, children }: { titulo?: string; subtitulo?: string; children: ReactNode }) {
   return (
     <div className="entrar">
       <div className="entrar-marca">
-        <div className="logo" aria-hidden>{SABOR === 'admin' ? 'ZA' : SABOR === 'miembros' ? 'ZM' : 'ZC'}</div>
+        <div className="logo" aria-hidden style={{ background: FONDO_LOGO }}><SimboloMarca tam={40} /></div>
         <h1>{titulo ?? NOMBRE_APP}</h1>
         <p>{subtitulo ?? (SABOR === 'admin' ? 'Administración del condominio' : 'Cuentas claras, vecinos tranquilos.')}</p>
         {api.modo === 'demo' && <span className="etiqueta etiqueta-alerta">Demostración · datos ficticios</span>}
@@ -108,7 +109,7 @@ function ConfigServidor() {
   );
 }
 
-/** ZPro Admin abierto por alguien que no es de la junta (o ZPro Miembros por alguien sin casa). */
+/** Vecinos ZPro Junta abierto por alguien que no es de la junta (o Vecinos ZPro por alguien sin casa). */
 export function SoloOtraApp({ cual }: { cual: 'junta' | 'miembros' }) {
   const ir = useNavigate();
   const s = api.sesion();
@@ -117,8 +118,8 @@ export function SoloOtraApp({ cual }: { cual: 'junta' | 'miembros' }) {
       <div className="entrar-caja">
         <div className="aviso aviso-info">
           {cual === 'junta'
-            ? <>Su cuenta en <strong>{s?.condominio}</strong> es de residente. Para ver su estado de cuenta, pagar y la alerta vecinal use la app <strong>ZPro Miembros</strong>.</>
-            : <>Su cuenta en <strong>{s?.condominio}</strong> es de la junta y no tiene una casa asociada. Para administrar el condominio use la app <strong>ZPro Admin</strong>.</>}
+            ? <>Su cuenta en <strong>{s?.condominio}</strong> es de residente. Para ver su estado de cuenta, pagar y la alerta vecinal use la app <strong>Vecinos ZPro</strong>.</>
+            : <>Su cuenta en <strong>{s?.condominio}</strong> es de la junta y no tiene una casa asociada. Para administrar el condominio use la app <strong>Vecinos ZPro Junta</strong>.</>}
         </div>
         <Link className="btn btn-sec btn-ancho" to="/elegir">Elegir otro condominio</Link>
         <button className="btn-texto" onClick={async () => { await api.salir(); ir('/entrar', { replace: true }); }}>Cerrar sesión</button>

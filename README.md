@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Qué es** | Administración de condominios: columna financiera para Presidencia, app para residentes con chat por casa, y consola master de ZentaPro |
-| **Paquetes (applicationId)** | ZPro Admin `com.zentapro.condominio.admin` · ZPro Miembros `com.zentapro.condominio` ⚠ *provisionales: el nombre de la app está por decidir* |
+| **Paquetes (applicationId)** | Vecinos ZPro Junta `com.zentapro.condominio.admin` · Vecinos ZPro `com.zentapro.condominio` ⚠ *provisionales: el nombre de la app está por decidir* |
 | **Desarrollador** | Technical Digital TD, C.A. (ZentaPro) · soporte@zentapro.com |
-| **Versión** | 0.5 · servidor propio en Docker local · alerta vecinal · dos apps: ZPro Admin (junta) y ZPro Miembros (vecinos) |
+| **Versión** | 0.5 · servidor propio en Docker local · alerta vecinal · dos apps: Vecinos ZPro Junta (junta) y Vecinos ZPro (vecinos) |
 | **Estado** | Funciona de punta a punta en local. Aún no publicado ni instalado en DigitalOcean |
 
 ## Cómo correrlo en su PC
@@ -56,7 +56,7 @@ npm test          # 128 pruebas de la API (levanta un PostgreSQL temporal solo)
 npm run test:sql  # reglas de la base de datos
 ```
 
-## APK de Android (dos apps: ZPro Admin y ZPro Miembros)
+## APK de Android (dos apps: Vecinos ZPro Junta y Vecinos ZPro)
 
 Las dos salen del mismo código (`app/`) como dos "sabores" de Android con paquetes, nombres e íconos distintos.
 

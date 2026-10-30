@@ -5,8 +5,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, type InfoInvitacion } from '../../data';
 import { Campo } from '../../components/ui';
 import { destino, guardarInvitacion as guardar, invitacionPendiente } from '../../navegacion';
-import { NOMBRE_APP, SABOR } from '../../sabor';
+import { NOMBRE_APP } from '../../sabor';
 import './cuenta.css';
+import { FONDO_LOGO, SimboloMarca } from '../../components/Logo';
 
 export function Invitacion() {
   const ir = useNavigate();
@@ -38,7 +39,7 @@ export function Invitacion() {
   return (
     <div className="entrar">
       <div className="entrar-marca">
-        <div className="logo" aria-hidden>{SABOR === 'admin' ? 'ZA' : SABOR === 'miembros' ? 'ZM' : 'ZC'}</div>
+        <div className="logo" aria-hidden style={{ background: FONDO_LOGO }}><SimboloMarca tam={40} /></div>
         <h1>Invitación</h1>
         <p>{info ? info.condominio : 'Cargando…'}{info?.ciudad ? ` · ${info.ciudad}` : ''}</p>
         {api.modo === 'demo' && <span className="etiqueta etiqueta-alerta">Demostración · datos ficticios</span>}

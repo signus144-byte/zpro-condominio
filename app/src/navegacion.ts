@@ -15,7 +15,7 @@ export function guardarInvitacion(p: InvitacionPendiente | null) {
   } catch { /* nada */ }
 }
 
-/** Inicio según el sabor: ZPro Admin → panel de la junta; ZPro Miembros → inicio del residente. */
+/** Inicio según el sabor: Vecinos ZPro Junta → panel de la junta; Vecinos ZPro → inicio del residente. */
 export function inicioDe(s: { esJunta: boolean; unidadId: string | null }): string {
   if (SABOR === 'admin') return s.esJunta ? '/p' : '/solo-junta';
   if (SABOR === 'miembros') return s.unidadId ? '/r' : '/solo-miembros';
