@@ -12,7 +12,7 @@ const ESTADOS_VE = ['Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bo
 
 const VACIO: NuevoCondominio = {
   nombre: '', tipo: 'edificio', ciudad: '', estadoGeo: 'Aragua', direccion: '', telefono: '', correo: '',
-  nombreAsociacion: '', rif: '', colorPrimario: '#0f4c4a', logo: null, fotoEntrada: null, unidades: [], diasPrueba: 30,
+  nombreAsociacion: '', rif: '', colorPrimario: '#0f4c4a', logo: null, fotoEntrada: null, unidades: [], diasPrueba: 15,
 };
 
 export function Alta() {

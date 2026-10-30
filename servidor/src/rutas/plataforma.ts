@@ -87,7 +87,7 @@ const NuevoCondominio = z.object({
   correo: z.string().trim().max(200).default(''), nombreAsociacion: z.string().trim().max(200).default(''),
   rif: z.string().trim().max(20).default(''), colorPrimario: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#0f4c4a'),
   planId: z.string().max(40).optional(),   // ignorado desde v0.4: el plan sale de la cantidad de unidades
-  diasPrueba: z.coerce.number().int().min(0).max(180).default(30),
+  diasPrueba: z.coerce.number().int().min(0).max(180).default(15),
   unidades: z.array(UnidadImport).min(1, 'cargue al menos una unidad').max(5000),
 });
 
