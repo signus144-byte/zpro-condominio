@@ -14,9 +14,10 @@ import rutasIntegraciones from './integraciones.js';
 import rutasTiempoReal from '../tiempo-real/rutas.js';
 import rutasNotificaciones from './notificaciones.js';
 import rutasAlertas from './alertas.js';
+import rutasDifusion from './difusion.js';
 
 export const RUTAS: FastifyPluginAsync[] = [
   rutasAuth, rutasArchivos, rutasCondominio, rutasFinanzas, rutasPartidas, rutasReportes,
   rutasDocumentos, rutasMiembros, rutasChat, rutasPlataforma, rutasIntegraciones, rutasTiempoReal,
-  rutasNotificaciones, rutasAlertas,
+  rutasNotificaciones, rutasAlertas, rutasDifusion,
 ];

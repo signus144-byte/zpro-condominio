@@ -7,7 +7,7 @@
 #      (opcional) -Instalar   → si hay un teléfono conectado por USB con "Depuración USB", las instala
 #      (opcional) -UrlDescarga "https://..."  → enlace para bajar Vecinos ZPro (va en el mensaje de invitación)
 #
-# Resultado: ..\releases\v0.5-prueba\Vecinos-ZPro-Junta-0.5.1-prueba.apk y Vecinos-ZPro-0.5.1-prueba.apk (+ huellas SHA-256)
+# Resultado: ..\releases\v0.5-prueba\Vecinos-ZPro-Junta-0.6-prueba.apk y Vecinos-ZPro-0.6-prueba.apk (+ huellas SHA-256)
 #
 # Son APK de PRUEBA: paquete con ".prueba", firmadas con una llave SOLO DE PRUEBA (no la oficial).
 # Sirven para ver la app en sus teléfonos; no se reparten a clientes ni se suben a Google Play.
@@ -17,7 +17,7 @@ param(
   [string]$UrlDescarga = ""
 )
 $ErrorActionPreference = "Stop"
-$version = "0.5.1"
+$version = "0.6"
 $app = $PSScriptRoot
 $android = Join-Path $app "android"
 $condominio = Split-Path $app -Parent

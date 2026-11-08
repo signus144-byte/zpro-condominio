@@ -58,7 +58,7 @@ describe('configuración y participación', () => {
 
   it('cercanía: por defecto bloque y número; la junta puede ajustarla', async () => {
     const cer = (await P.pedir('GET', url('alerta/cercania'), pres.acceso)).json as { etiqueta: string; sector: string; posicion: number }[];
-    assert.deepEqual(cer.find((u) => u.etiqueta === 'Apto B-33'), { unidadId: UNI('b3'), etiqueta: 'Apto B-33', sector: 'B', posicion: 33, personalizada: false });
+    assert.deepEqual(cer.find((u) => u.etiqueta === 'Apto B-33'), { unidadId: UNI('b3'), etiqueta: 'Apto B-33', sector: 'B', posicion: 33, piso: '3', personalizada: false });
     assert.equal((await P.pedir('GET', url('alerta/cercania'), b33.acceso)).status, 403);
   });
 });

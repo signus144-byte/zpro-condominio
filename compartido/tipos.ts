@@ -72,16 +72,29 @@ export interface Votacion {
   id: string; titulo: string; ponderacion: Ponderacion; umbralPct: number;
   estado: 'borrador' | 'abierta' | 'cerrada' | 'anulada'; cierraEn: string | null;
   opciones: OpcionVoto[]; miVotoOpcionId: string | null;
+  sinVotar?: number | null;         // solo para la junta: casas con derecho a voto que aún no votan
 }
 export interface Partida {
   id: string; titulo: string; descripcion: string | null; presupuestoUsd: number; numeroCuotas: number;
   primeraCuota: string | null; reparto: Ponderacion; estado: EstadoPartida; creadoEn: string;
   votacion: Votacion | null;
-  cuotaMiUnidadUsd: number | null;  // cuánto le tocaría pagar por cuota a la unidad del residente
+  cuotaMiUnidadUsd: number | null;  // cuánto le tocaría pagar por cuota a la unidad del residente (null si no le aplica)
+  /** A quién aplica (v0.6): todo el condominio o solo algunas casas (una calle, un piso…). Solo esas la ven, votan y pagan. */
+  alcance: { tipo: 'todos' | 'unidades'; nombre: string | null; unidades: number };
+  meAfecta: boolean;                // alguna de mis casas está incluida
+  unidadIds?: string[];             // solo para la junta: las casas incluidas
 }
+/** A quién se dirige algo (cuota especial o mensaje masivo). */
+export type AlcanceCasas =
+  | { tipo: 'todos' }
+  | { tipo: 'grupo'; grupoId: string }
+  | { tipo: 'unidades'; unidadIds: string[]; nombre?: string };
 export interface NuevaPartida {
   titulo: string; descripcion: string; presupuestoUsd: number; numeroCuotas: number; primeraCuota: string;
   reparto: Ponderacion; someterAVotacion: boolean; umbralPct: number; cierraEn: string | null;
+  alcance?: AlcanceCasas;           // por defecto todo el condominio
+  /** Avisar de una vez a las casas incluidas (mensaje masivo). Por defecto sí. */
+  difundir?: boolean;
 }
 
 export interface Reporte {
@@ -226,12 +239,13 @@ export type EventoTiempoReal =
 
 // ---------------- v0.4: notificaciones ----------------
 export type TipoNotificacion = 'pago_reportado' | 'pago_confirmado' | 'pago_rechazado' | 'pagos_pendientes' | 'chat_vecinos' | 'general'
-  | 'alerta' | 'alerta_cerrada' | 'solicitud_ingreso';
+  | 'alerta' | 'alerta_cerrada' | 'solicitud_ingreso' | 'difusion';
 export interface Notificacion {
   id: string; tipo: TipoNotificacion; condominioId: string | null;
   titulo: string; cuerpo: string;
   datos: { pagoId?: string; alertaId?: string; tipoAlerta?: TipoAlerta;
-           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos'; pendientes?: number };
+           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos' | 'partidas' | 'avisos'; pendientes?: number;
+           partidaId?: string; difusionId?: string };
   leida: boolean; creadoEn: string;
 }
 export interface BandejaNotificaciones { noLeidas: number; notificaciones: Notificacion[] }
@@ -272,7 +286,25 @@ export interface ParticipanteAlerta {
   usuarioId: string; nombre: string; unidad: string | null; activo: boolean; tieneVehiculo: boolean; personalSalud: boolean;
   suspendidoHasta: string | null; motivoSuspension: string | null; alertasEmitidas: number; falsasAlarmas: number;
 }
-export interface CercaniaUnidad { unidadId: string; etiqueta: string; sector: string; posicion: number | null; personalizada: boolean }
+export interface CercaniaUnidad { unidadId: string; etiqueta: string; sector: string; posicion: number | null; personalizada: boolean;
+  piso?: string | null }          // v0.6: piso (cargado o deducido del número)
+
+// ---------------- v0.6: grupos de casas y difusión masiva ----------------
+/** Casa con los datos para filtrar (por bloque/calle o por piso) al elegir a quién va algo. */
+export interface UnidadAlcance { id: string; etiqueta: string; bloque: string | null; sector: string; piso: string | null; alicuota: number }
+export interface GrupoUnidades { id: string; nombre: string; descripcion: string | null; unidadIds: string[] }
+export interface NuevoGrupo { nombre: string; descripcion?: string | null; unidadIds: string[] }
+export type AlcanceDifusion = AlcanceCasas | { tipo: 'partida'; partidaId: string } | { tipo: 'sin_votar'; partidaId: string };
+export interface NuevaDifusion {
+  titulo: string; cuerpo: string; alcance: AlcanceDifusion;
+  soloPropietarios?: boolean;      // por defecto a todos los de cada casa (propietarios e inquilinos)
+  partidaId?: string;              // para enlazar el mensaje a una cuota especial
+}
+export interface PreviaDifusion { unidades: number; personas: number }
+export interface Difusion {
+  id: string; titulo: string; cuerpo: string; alcance: AlcanceDifusion['tipo']; alcanceNombre: string | null;
+  partidaId: string | null; soloPropietarios: boolean; unidades: number; personas: number; creadoEn: string; creadoPor: string | null;
+}
 
 // ---------------- v0.5: enlace de invitación ----------------
 export interface EnlaceInvitacion { codigo: string; url: string; expiraEn: string; usos: number }

@@ -1,4 +1,4 @@
-# Contrato de la API · ZPro Condominio v0.5
+# Contrato de la API · Vecinos ZPro v0.6
 
 Base: `/api/v1`. JSON en camelCase. Los tipos de respuesta están en `compartido/tipos.ts` (app) y
 `compartido/plataforma.ts` (consola): **el servidor devuelve exactamente esos tipos**.
@@ -183,6 +183,28 @@ SQL: `0020_enlace_invitacion.sql`. Un enlace por condominio (1 año, muchos usos
 | POST `invitacion/:codigo/unirse` | `{unidadId, rol: 'propietario'\|'inquilino'}` | `{estado: 'pendiente'\|'aprobada'}` (con sesión) |
 
 Cada solicitud de ingreso nueva notifica a presidencia/administración (`solicitud_ingreso`).
+
+## 8e. Alcance de las cuotas especiales y difusión masiva (`src/rutas/difusion.ts`) ✅ — v0.6
+
+SQL: `0021_alcance_y_difusion.sql`. Una cuota especial puede ser de todo el condominio o solo de algunas casas (una calle con
+portón propio, un piso con su llave). Con alcance limitado **solo esas casas la ven** (RLS), **solo sus propietarios votan**
+(el % se mide sobre ellas), el acta lista solo esas casas y **solo a ellas se les cobra** (por alícuota relativa o partes iguales).
+
+`AlcanceCasas` = `{tipo:'todos'}` · `{tipo:'grupo', grupoId}` · `{tipo:'unidades', unidadIds, nombre?}`.
+`AlcanceDifusion` = lo anterior · `{tipo:'partida', partidaId}` (las casas de la cuota) · `{tipo:'sin_votar', partidaId}`.
+
+| Método y ruta | Cuerpo | Respuesta |
+|---|---|---|
+| POST `c/:cid/partidas` | + `alcance?: AlcanceCasas`, `difundir?: boolean` (por defecto sí) | 201 `{id, difusion: {id, unidades, personas} \| null}` |
+| GET `c/:cid/partidas` | — | `Partida[]` con `alcance {tipo, nombre, unidades}`, `meAfecta`, `unidadIds` (solo junta), `votacion.sinVotar` (solo junta) |
+| GET `c/:cid/unidades-alcance` | — | `UnidadAlcance[]` (bloque, sector, piso, alícuota) · junta |
+| GET · POST `c/:cid/grupos` · PUT · DELETE `c/:cid/grupos/:gid` | `{nombre, descripcion?, unidadIds}` | `GrupoUnidades` · junta; nombre único sin importar mayúsculas ni acentos (409) |
+| POST `c/:cid/difusiones/previa` | `{alcance, soloPropietarios?}` | `{unidades, personas}` |
+| POST `c/:cid/difusiones` | `{titulo, cuerpo, alcance, soloPropietarios?, partidaId?}` | 201 `{id, unidades, personas}` · junta · máx. 20 por día |
+| GET `c/:cid/difusiones` | — | `Difusion[]` (historial) · junta |
+| PUT `c/:cid/alerta/cercania` | + `piso` por casa | el piso se deduce del número si no se carga (34 → 3, 1204 → 12) |
+
+Cada difusión llega como notificación `difusion` (app, push y correo) a las personas de esas casas, salvo quien la envía.
 
 ## 9. Plataforma / consola master (`src/rutas/plataforma.ts`) ✅
 

@@ -107,18 +107,21 @@ export default async function rutasAlertas(app: FastifyInstance) {
       const r = await c.query(`select es_junta($1) as j`, [cid]);
       if (!r.rows[0].j) throw new ErrorApi(403, 'Solo la junta ve la cercanía', 'sin_permiso');
       const filas = (await c.query(`select u.id, etiqueta_unidad(u) as etiqueta, sector_unidad(u) as sector, posicion_unidad(u) as posicion,
-                                           (u.sector is not null or u.posicion is not null) as personalizada
+                                           piso_unidad(u) as piso,
+                                           (u.sector is not null or u.posicion is not null or u.piso is not null) as personalizada
                                       from unidades u where u.condominio_id = $1 order by sector_unidad(u), posicion_unidad(u) nulls last, u.numero`, [cid])).rows;
-      return filas.map((u) => ({ unidadId: u.id, etiqueta: u.etiqueta, sector: u.sector, posicion: u.posicion, personalizada: u.personalizada }));
+      return filas.map((u) => ({ unidadId: u.id, etiqueta: u.etiqueta, sector: u.sector, posicion: u.posicion, piso: u.piso ?? null, personalizada: u.personalizada }));
     });
   });
 
   app.put('/c/:cid/alerta/cercania', async (req) => {
     const { cid } = ParamsC.parse(req.params);
-    const d = z.array(z.object({ unidadId: Uuid, sector: z.string().trim().max(40).nullable(), posicion: z.number().int().min(-100000).max(100000).nullable() }))
+    const d = z.array(z.object({ unidadId: Uuid, sector: z.string().trim().max(40).nullable(), posicion: z.number().int().min(-100000).max(100000).nullable(),
+                                 piso: z.string().trim().max(20).nullable().optional() }))
       .max(5000).parse(req.body);
-    const r = await bd(req, (c) => c.query(`select fijar_cercania($1, $2::uuid[], $3::text[], $4::int[]) as n`,
-      [cid, d.map((x) => x.unidadId), d.map((x) => x.sector), d.map((x) => x.posicion)]));
+    const conPiso = d.some((x) => x.piso !== undefined);
+    const r = await bd(req, (c) => c.query(`select fijar_cercania($1, $2::uuid[], $3::text[], $4::int[], $5::text[]) as n`,
+      [cid, d.map((x) => x.unidadId), d.map((x) => x.sector), d.map((x) => x.posicion), conPiso ? d.map((x) => x.piso ?? null) : null]));
     return { actualizadas: Number(r.rows[0].n) };
   });
 

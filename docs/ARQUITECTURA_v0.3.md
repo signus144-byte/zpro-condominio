@@ -1,4 +1,4 @@
-# ZPro Condominio · Arquitectura v0.5 (servidor propio)
+# Vecinos ZPro · Arquitectura v0.6 (servidor propio)
 
 *27-oct-2026 · Technical Digital TD, C.A. · Reemplaza a la v0.2 en todo lo relativo al servidor. v0.4: decisiones comerciales de Dirección (§6).*
 
@@ -54,7 +54,7 @@ A diferencia del plan anterior (Supabase), **el chat en tiempo real sí cabe en 
 
 ## 4. Pruebas
 
-- **128 pruebas de la API** + reglas SQL, todas contra **PostgreSQL 18 real** (cuentas, sesiones, permisos de cada rol, finanzas, conciliación, votaciones, reportes anónimos, documentos, chat, WebSocket con clientes reales, tareas, webhook, consola).
+- **138 pruebas de la API** + reglas SQL, todas contra **PostgreSQL 18 real** (cuentas, sesiones, permisos de cada rol, finanzas, conciliación, votaciones, reportes anónimos, documentos, chat, WebSocket con clientes reales, tareas, webhook, consola).
 - **Recorrido de punta a punta** con el servidor compilado como en producción: inicio de sesión real, chat en tiempo real entre una residente y la presidenta, pago reportado y confirmado, consola master. Sin errores.
 - Docker no se pudo ejecutar en el entorno de desarrollo (sin acceso a Docker Hub); los archivos están listos y se prueban en su PC con `docker compose up --build`.
 
@@ -91,3 +91,14 @@ A diferencia del plan anterior (Supabase), **el chat en tiempo real sí cabe en 
 | **Contra el abuso** | Participación voluntaria; una alerta activa a la vez; 3 por día; la junta ve falsas alarmas por persona y puede suspender; cierre automático a las 3 h; todo queda registrado |
 | **Dos apps** | Vecinos ZPro Junta (junta) y Vecinos ZPro (vecinos): mismo código, dos sabores de Android, íconos distintos. Admin comparte un enlace de invitación (QR/WhatsApp); el vecino elige su casa y la junta aprueba |
 | **Compilación** | Proyecto Android en `app/android` (Capacitor 8, targetSdk 36). APK de prueba con `app/compilar_apk.ps1` en la PC o en GitHub Actions. Release oficial solo con nombre definitivo y llave oficial |
+
+## 8. Votaciones por sector y mensajes masivos (v0.6, 8-nov-2026)
+
+| Tema | Cómo quedó |
+|---|---|
+| **Alcance de una cuota especial** | Todo el condominio, un grupo guardado o casas elegidas (filtros por calle/bloque y por piso). La lista de casas se guarda con la cuota |
+| **Quién la ve** | Solo las casas incluidas y la junta. Lo decide la base de datos (RLS), no la app: una casa fuera del alcance no la recibe ni puede votarla |
+| **Quién vota** | Solo los propietarios de las casas incluidas; el porcentaje (por alícuota o una casa = un voto) se mide sobre ellas y el acta las lista solo a ellas |
+| **Quién paga** | Solo esas casas: el presupuesto se reparte entre ellas por su alícuota relativa o en partes iguales |
+| **Mensajes masivos** | A todo el condominio, un grupo, casas elegidas, las casas de una cuota o solo las que no han votado; solo propietarios si se desea; vista previa de alcance; historial; máximo 20 por día. Llegan como notificación (app, push y correo) |
+| **WhatsApp** | La app arma el texto para que la junta lo comparta en el grupo del condominio (WhatsApp no permite enviar mensajes masivos automáticos sin una cuenta empresarial verificada) |

@@ -13,7 +13,7 @@ const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const android = path.join(raiz, 'android');
 const prueba = process.argv.includes('--prueba');
 const conPush = existsSync(path.join(android, 'app', 'google-services.json'));
-const version = '0.5.1';
+const version = '0.6';
 
 const correr = (cmd, env = {}) => {
   console.log(`\n> ${cmd}`);

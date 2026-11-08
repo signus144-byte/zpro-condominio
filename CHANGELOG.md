@@ -1,4 +1,11 @@
-# Historial de versiones · ZPro Condominio
+# Historial de versiones · Vecinos ZPro
+
+## 0.6 · 8-nov-2026 · Votaciones por sector y mensajes masivos
+- **Cuotas especiales para algunas casas**: una calle con portón propio, un piso con su llave, o casas elegidas. Solo esas casas ven la cuota y su votación, solo sus propietarios votan (el porcentaje se mide sobre ellas), el acta lista solo esas casas y el recibo cobra solo a ellas, repartido entre ellas.
+- **Mensajes masivos** de la junta: a todo el condominio, a un grupo guardado, a casas elegidas, a las casas de una cuota especial o solo a las que aún no han votado; vista previa de cuántas casas y personas lo recibirán; opción "solo propietarios"; historial. Al crear una cuota especial se avisa de una vez a las casas incluidas.
+- **Grupos de casas** guardados ("Calle 3 · portón", "Torre B · piso 4") y piso de cada casa (se deduce del número y se puede corregir).
+- Compartir por WhatsApp el aviso de una votación.
+- 138 pruebas de la API + reglas SQL, todas pasan.
 
 ## 0.5 · 28-oct-2026 · Alerta vecinal y dos apps (Admin y Miembros)
 - **Alerta vecinal (botón SOS)**: 4 botones grandes (Seguridad, Emergencia médica, Incendio, Otra emergencia). Quien avisa confirma que es el dueño del teléfono con huella, rostro, patrón o PIN (en la web, con su clave) y la alerta sale con su nombre y su casa.
