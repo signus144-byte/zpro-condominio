@@ -1,0 +1,43 @@
+/* ¿Para quién es? — selector de alcance (cuotas especiales y mensajes masivos) */
+.alcance-modos { display: flex; flex-direction: column; gap: 8px; }
+.alcance-modo {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; min-height: 52px;
+  border: 1px solid var(--linea); border-radius: 12px; background: var(--superficie); cursor: pointer;
+}
+.alcance-modos { min-width: 0; }
+label.alcance-modo > input[type=radio] { width: 22px; height: 22px; min-width: 0; margin: 1px 0 0; padding: 0; border: 0; accent-color: var(--primario); flex: none; }
+.alcance-modo span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.alcance-modo small { color: var(--texto-2); font-size: 0.8rem; }
+.alcance-modo.activo { border-color: var(--primario); background: var(--primario-suave); }
+.alcance-detalle { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; background: var(--fondo); }
+
+.casas-filtros { display: flex; flex-direction: column; gap: 6px; }
+.casas-filtros .chips { gap: 6px; }
+.casas-filtros .chip { min-height: 38px; }
+.casas-filtros .etq { font-size: 0.75rem; font-weight: 650; color: var(--texto-2); text-transform: uppercase; letter-spacing: 0.04em; }
+.casas-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 6px; max-height: 320px; overflow-y: auto; padding: 2px; }
+.casa-check {
+  display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 8px 10px; border-radius: 10px;
+  border: 1px solid var(--linea); background: var(--superficie); cursor: pointer; font-size: 0.9rem;
+}
+.casa-check input { width: 20px; height: 20px; accent-color: var(--primario); flex: none; margin: 0; }
+.casa-check.marcada { border-color: var(--primario); background: var(--primario-suave); font-weight: 600; }
+.casa-check small { display: block; color: var(--texto-2); font-weight: 400; font-size: 0.72rem; }
+.casas-cuenta { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.9rem; }
+.casas-cuenta strong { color: var(--primario); }
+
+/* Alcance y acciones de la junta en las cuotas especiales */
+.partida-alcance { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.partida.resaltada { outline: 3px solid var(--acento, #e6a23c); outline-offset: 2px; }
+.faltan-votar { display: flex; flex-direction: column; gap: 8px; border-top: 1px dashed var(--linea); padding-top: 10px; }
+
+/* Mensaje masivo */
+.previa { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--primario-suave); color: var(--primario); font-weight: 650; }
+.previa small { font-weight: 400; color: var(--texto-2); display: block; }
+.confirmar-envio { border: 2px solid var(--primario); }
+.btn.btn-whatsapp, a.btn-whatsapp { background: #128c4a; border-color: #128c4a; color: #fff; }
+.difusiones li { flex-direction: column; align-items: stretch; gap: 2px; }
+.difusiones p { margin: 2px 0; font-size: 0.9rem; white-space: pre-line; }
+.grupo-casas { font-size: 0.85rem; color: var(--texto-2); }
+.notif-completa h2 { margin: 0; }
+.notif-completa p { white-space: pre-line; line-height: 1.5; margin: 0; }

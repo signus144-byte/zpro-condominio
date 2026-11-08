@@ -566,31 +566,36 @@ function Participantes({ puede }: { puede: boolean }) {
   );
 }
 
-function Cercania({ puede }: { puede: boolean }) {
+export function Cercania({ puede }: { puede: boolean }) {
+  type CampoU = 'sector' | 'posicion' | 'piso';
   const { datos, cargando, error, recargar } = useCarga(() => api.cercania());
-  const [cambios, setCambios] = useState<Record<string, { sector: string; posicion: string }>>({});
+  const [cambios, setCambios] = useState<Record<string, Record<CampoU, string>>>({});
   const [ok, setOk] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const valor = (uid: string, campo: 'sector' | 'posicion', original: string) => cambios[uid]?.[campo] ?? original;
-  function cambiar(uid: string, campo: 'sector' | 'posicion', v: string, fila: { sector: string; posicion: number | null }) {
-    setCambios((c) => ({ ...c, [uid]: { sector: c[uid]?.sector ?? fila.sector, posicion: c[uid]?.posicion ?? (fila.posicion?.toString() ?? ''), [campo]: v } }));
+  const valor = (uid: string, campo: CampoU, original: string) => cambios[uid]?.[campo] ?? original;
+  function cambiar(uid: string, campo: CampoU, v: string, fila: { sector: string; posicion: number | null; piso?: string | null }) {
+    setCambios((c) => ({ ...c, [uid]: {
+      sector: c[uid]?.sector ?? fila.sector, posicion: c[uid]?.posicion ?? (fila.posicion?.toString() ?? ''),
+      piso: c[uid]?.piso ?? (fila.piso ?? ''), [campo]: v,
+    } }));
   }
   async function guardar() {
     setOk(null); setErr(null);
     const lista = Object.entries(cambios).map(([unidadId, c]) => ({
-      unidadId, sector: c.sector.trim() || null, posicion: c.posicion.trim() === '' ? null : Number(c.posicion),
+      unidadId, sector: c.sector.trim() || null, posicion: c.posicion.trim() === '' ? null : Number(c.posicion), piso: c.piso.trim() || null,
     }));
     if (lista.some((x) => x.posicion !== null && !Number.isFinite(x.posicion))) return setErr('La posición debe ser un número.');
     try { const n = await api.fijarCercania(lista); setCambios({}); setOk(`${n} casa${n === 1 ? '' : 's'} actualizada${n === 1 ? '' : 's'}.`); recargar(); }
     catch (e) { setErr((e as Error).message); }
   }
   return (
-    <Tarjeta titulo="Cercanía de las casas">
+    <Tarjeta titulo="Ubicación de las casas">
       <p className="nota">Dos casas son vecinas si están en el mismo <strong>sector</strong> (calle, bloque o torre) y su <strong>posición</strong> está cerca.
-        Por defecto se usa el bloque y el número de la casa. Corríjalo si la numeración no sigue el orden real de la calle.</p>
+        Por defecto se usa el bloque y el número de la casa. Corríjalo si la numeración no sigue el orden real de la calle.
+        El <strong>piso</strong> sirve para enviar cuotas y mensajes solo a un piso (se deduce del número del apartamento; déjelo vacío en casas).</p>
       <Estado cargando={cargando} error={error}>
         <table className="tabla cercania-tabla">
-          <thead><tr><th>Casa</th><th>Sector</th><th>Posición</th></tr></thead>
+          <thead><tr><th>Casa</th><th>Sector</th><th>Posición</th><th>Piso</th></tr></thead>
           <tbody>
             {datos?.map((u) => (
               <tr key={u.unidadId}>
@@ -599,6 +604,8 @@ function Cercania({ puede }: { puede: boolean }) {
                            onChange={(e) => cambiar(u.unidadId, 'sector', e.target.value, u)} /></td>
                 <td><input value={valor(u.unidadId, 'posicion', u.posicion?.toString() ?? '')} disabled={!puede} inputMode="numeric" aria-label={`Posición de ${u.etiqueta}`}
                            onChange={(e) => cambiar(u.unidadId, 'posicion', e.target.value, u)} /></td>
+                <td><input value={valor(u.unidadId, 'piso', u.piso ?? '')} disabled={!puede} maxLength={20} aria-label={`Piso de ${u.etiqueta}`}
+                           onChange={(e) => cambiar(u.unidadId, 'piso', e.target.value, u)} /></td>
               </tr>
             ))}
           </tbody>
@@ -608,5 +615,15 @@ function Cercania({ puede }: { puede: boolean }) {
       {ok && <div className="aviso aviso-ok">{ok}</div>}
       {err && <div className="aviso aviso-error">{err}</div>}
     </Tarjeta>
+  );
+}
+
+/** Pantalla propia para la ubicación de las casas (sector, posición y piso), enlazada desde Grupos de casas. */
+export function UbicacionCasas() {
+  const cfg = useCarga(() => api.configAlerta());
+  return (
+    <Estado cargando={cfg.cargando} error={cfg.error}>
+      {cfg.datos && <Cercania puede={cfg.datos.puedoConfigurar} />}
+    </Estado>
   );
 }

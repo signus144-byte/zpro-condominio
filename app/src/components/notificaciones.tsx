@@ -32,6 +32,8 @@ export function destinoNotificacion(n: Notificacion, prefijo: string): string {
     case 'chat': return `${prefijo}/chats`;
     case 'alerta': return n.datos.alertaId ? `${prefijo}/alertas/${n.datos.alertaId}` : `${prefijo}/alerta-vecinal`;
     case 'accesos': return s?.esJunta && SABOR !== 'miembros' ? '/p/accesos' : prefijo;
+    case 'partidas': return `${prefijo}/partidas${n.datos.partidaId ? `?p=${n.datos.partidaId}` : ''}`;
+    case 'avisos': return `${prefijo}/notificacion/${n.id}`;
     default: return prefijo;
   }
 }
@@ -96,7 +98,7 @@ export function Campana() {
 
 const TONO: Record<Notificacion['tipo'], string> = {
   pago_confirmado: 'ok', pago_rechazado: 'error', pago_reportado: 'info', pagos_pendientes: 'alerta', chat_vecinos: 'info', general: 'info',
-  alerta: 'error', alerta_cerrada: 'ok', solicitud_ingreso: 'alerta',
+  alerta: 'error', alerta_cerrada: 'ok', solicitud_ingreso: 'alerta', difusion: 'info',
 };
 
 export function Notificaciones() {

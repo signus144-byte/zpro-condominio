@@ -2,13 +2,14 @@
 // Contrato: servidor/CONTRATO_API.md. El servidor devuelve exactamente los tipos de compartido/tipos.ts.
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
-import type { Api, EventoAlerta } from './api';
+import type { Api, DifusionEnviada, EventoAlerta } from './api';
 import type {
   Adjunto, CasaDirectorio, CodigoAcceso, ComentarioReporte, Condominio, Conversacion, CuentaFinanciera, DatosPagoZentaPro,
   EstadoCuenta, EventoTiempoReal, FacturaZentaPro, FilaActa, Gasto, Marca, MiembroCondominio, Mensaje, MovimientoBancario,
   Pago, Partida, Reporte, ResultadoExtracto, ResumenPanel, Rol, Sesion, SesionTokens, SolicitudIngresoJunta,
   UnidadConSaldo, Yo, Aviso, BandejaNotificaciones, Notificacion,
   AlertaVecinal, CercaniaUnidad, ConfigAlerta, EnlaceInvitacion, InfoInvitacion, ParticipanteAlerta,
+  Difusion, GrupoUnidades, PreviaDifusion, UnidadAlcance,
 } from './tipos';
 
 const JUNTA: Rol[] = ['presidente', 'tesorero', 'vocal', 'administrador'];
@@ -389,7 +390,7 @@ export function crearApiServidor(base: string): Api {
 
     // ---- Partidas ----
     partidas: () => pedir<Partida[]>('GET', c('/partidas')),
-    async crearPartida(p) { await pedir('POST', c('/partidas'), { ...p }); },
+    crearPartida: (p) => pedir<{ id: string; difusion: DifusionEnviada | null }>('POST', c('/partidas'), { ...p }),
     async votar(vid, opcionId) { await pedir('POST', c(`/votaciones/${vid}/votar`), { opcionId }); },
     async cerrarVotacion(vid) { return (await pedir<{ aprobada: boolean }>('POST', c(`/votaciones/${vid}/cerrar`), {})).aprobada; },
 
@@ -495,6 +496,15 @@ export function crearApiServidor(base: string): Api {
       }, 20_000);
       return () => { quitar(); clearInterval(respaldo); };
     },
+    // ---- Grupos de casas y mensajes masivos ----
+    unidadesAlcance: () => pedir<UnidadAlcance[]>('GET', c('/unidades-alcance')),
+    grupos: () => pedir<GrupoUnidades[]>('GET', c('/grupos')),
+    crearGrupo: (g) => pedir<GrupoUnidades>('POST', c('/grupos'), { ...g }),
+    editarGrupo: (id, g) => pedir<GrupoUnidades>('PUT', c(`/grupos/${id}`), { ...g }),
+    async borrarGrupo(id) { await pedir('DELETE', c(`/grupos/${id}`)); },
+    previaDifusion: (alcance, soloPropietarios) => pedir<PreviaDifusion>('POST', c('/difusiones/previa'), { alcance, soloPropietarios }),
+    difundir: (d) => pedir<DifusionEnviada>('POST', c('/difusiones'), { ...d }),
+    difusiones: () => pedir<Difusion[]>('GET', c('/difusiones')),
     async registrarDispositivo(token, plataforma) { await pedir('POST', 'auth/dispositivos', { token, plataforma }); },
 
     // ---- Enlace de invitación ----

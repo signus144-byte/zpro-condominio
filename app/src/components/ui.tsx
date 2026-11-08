@@ -28,9 +28,9 @@ export function Estado({ cargando, error, children }: { cargando: boolean; error
   return <>{children}</>;
 }
 
-export function Tarjeta({ titulo, accion, children, className = '' }: { titulo?: ReactNode; accion?: ReactNode; children: ReactNode; className?: string }) {
+export function Tarjeta({ titulo, accion, children, className = '', id }: { titulo?: ReactNode; accion?: ReactNode; children: ReactNode; className?: string; id?: string }) {
   return (
-    <section className={`tarjeta ${className}`}>
+    <section id={id} className={`tarjeta ${className}`}>
       {(titulo || accion) && <header className="tarjeta-cab"><h2>{titulo}</h2>{accion}</header>}
       {children}
     </section>

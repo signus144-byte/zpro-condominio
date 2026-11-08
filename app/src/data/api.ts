@@ -7,7 +7,11 @@ import type {
   BandejaNotificaciones, Notificacion,
   AlertaVecinal, CercaniaUnidad, ConfigAlerta, EnlaceInvitacion, EstadoAlerta, InfoInvitacion, NuevaAlerta,
   ParticipanteAlerta, RespuestaAlerta,
+  AlcanceDifusion, Difusion, GrupoUnidades, NuevaDifusion, NuevoGrupo, PreviaDifusion, UnidadAlcance,
 } from './tipos';
+
+/** Resultado de un mensaje masivo. */
+export interface DifusionEnviada { id: string; unidades: number; personas: number }
 
 /** Evento en vivo de una alerta vecinal (nueva, respuesta de un vecino, cerrada…). */
 export interface EventoAlerta { alertaId: string; evento: 'nueva' | 'ampliada' | 'respuesta' | 'visto' | 'cerrada' }
@@ -95,7 +99,8 @@ export interface Api {
 
   // ---------------- Partidas especiales y votaciones ----------------
   partidas(): Promise<Partida[]>;
-  crearPartida(p: NuevaPartida): Promise<void>;
+  /** Crea la cuota especial; si se pidió, avisa de una vez a las casas incluidas (difusion != null). */
+  crearPartida(p: NuevaPartida): Promise<{ id: string; difusion: DifusionEnviada | null }>;
   votar(votacionId: string, opcionId: string): Promise<void>;
   cerrarVotacion(votacionId: string): Promise<boolean>;
 
@@ -138,7 +143,17 @@ export interface Api {
   participantesAlerta(): Promise<ParticipanteAlerta[]>;
   suspenderDeAlerta(usuarioId: string, dias: number, motivo?: string): Promise<void>;
   cercania(): Promise<CercaniaUnidad[]>;
-  fijarCercania(cambios: { unidadId: string; sector: string | null; posicion: number | null }[]): Promise<number>;
+  fijarCercania(cambios: { unidadId: string; sector: string | null; posicion: number | null; piso?: string | null }[]): Promise<number>;
+
+  // ---------------- Grupos de casas y mensajes masivos (v0.6, junta) ----------------
+  unidadesAlcance(): Promise<UnidadAlcance[]>;
+  grupos(): Promise<GrupoUnidades[]>;
+  crearGrupo(g: NuevoGrupo): Promise<GrupoUnidades>;
+  editarGrupo(id: string, g: NuevoGrupo): Promise<GrupoUnidades>;
+  borrarGrupo(id: string): Promise<void>;
+  previaDifusion(alcance: AlcanceDifusion, soloPropietarios: boolean): Promise<PreviaDifusion>;
+  difundir(d: NuevaDifusion): Promise<DifusionEnviada>;
+  difusiones(): Promise<Difusion[]>;
   emitirAlerta(a: NuevaAlerta): Promise<AlertaVecinal>;
   alertas(soloActivas?: boolean): Promise<AlertaVecinal[]>;
   alerta(id: string): Promise<AlertaVecinal>;

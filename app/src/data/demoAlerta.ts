@@ -37,7 +37,7 @@ const espera = () => new Promise((r) => setTimeout(r, 120));
 
 export function crearAlertaDemo(k: ContextoAlertaDemo) {
   const red = { activa: true, radio: 3 };
-  const cercania = new Map<string, { sector: string | null; posicion: number | null }>();
+  const cercania = new Map<string, { sector: string | null; posicion: number | null; piso?: string | null }>();
   const participantes = new Map<string, Participante>([
     ['usr-elena', { usuarioId: 'usr-elena', activo: true, tieneVehiculo: false, personalSalud: false, telefono: '0414-123 45 67', suspendidoHasta: null, motivoSuspension: null }],
     ['usr-pedro', { usuarioId: 'usr-pedro', activo: true, tieneVehiculo: true, personalSalud: false, telefono: '0412-765 43 21', suspendidoHasta: null, motivoSuspension: null }],
@@ -63,6 +63,17 @@ export function crearAlertaDemo(k: ContextoAlertaDemo) {
   const puedeConfigurar = (s: Sesion) => ['presidente', 'administrador'].includes(s.rol);
   const sector = (u: Unidad) => (cercania.get(u.id)?.sector ?? u.bloque ?? '').toUpperCase();
   const posicion = (u: Unidad) => cercania.get(u.id)?.posicion ?? (Number((u.numero.match(/\d+/) ?? [])[0]) || null);
+  /** Piso: el cargado por la junta o, si no, deducido del número (34 → 3, 1204 → 12), como piso_unidad() en SQL. */
+  const piso = (u: Unidad): string | null => {
+    const cargado = cercania.get(u.id)?.piso;
+    if (cargado?.trim()) return cargado.trim();
+    const m = /^\D*(\d+)$/.exec(u.numero);
+    if (!m) return null;
+    const d = m[1];
+    if (d.length === 2 || d.length === 3) return d[0];
+    if (d.length === 4) return String(Number(d.slice(0, 2)));
+    return null;
+  };
   function cercanas(uid: string, radio: number) {
     const u = k.unidades.find((x) => x.id === uid)!;
     return new Set(k.unidades.filter((o) => o.id !== uid && (radio === 0 || (sector(o) === sector(u)
@@ -176,6 +187,11 @@ export function crearAlertaDemo(k: ContextoAlertaDemo) {
   }
 
   return {
+    /** Ubicación de una casa (sector/calle y piso), para elegir a quién va un mensaje o una cuota especial. */
+    ubicacion(uid: string) {
+      const u = k.unidades.find((x) => x.id === uid)!;
+      return { sector: sector(u), piso: piso(u) };
+    },
     async configAlerta(): Promise<ConfigAlerta> {
       vencer();
       const s = yo();
@@ -233,13 +249,17 @@ export function crearAlertaDemo(k: ContextoAlertaDemo) {
       const s = yo();
       if (!s.esJunta) throw new Error('Solo la junta ve la cercanía');
       return k.unidades.map((u) => ({ unidadId: u.id, etiqueta: k.etiquetaUnidad(u.id)!, sector: sector(u), posicion: posicion(u),
-                                      personalizada: cercania.has(u.id) }))
+                                      piso: piso(u), personalizada: cercania.has(u.id) }))
         .sort((a, b) => a.sector.localeCompare(b.sector) || (a.posicion ?? 1e9) - (b.posicion ?? 1e9));
     },
-    async fijarCercania(cambios: { unidadId: string; sector: string | null; posicion: number | null }[]) {
+    async fijarCercania(cambios: { unidadId: string; sector: string | null; posicion: number | null; piso?: string | null }[]) {
       const s = yo();
       if (!puedeConfigurar(s)) throw new Error('Sin permiso');
-      for (const c of cambios) cercania.set(c.unidadId, { sector: c.sector?.trim() || null, posicion: c.posicion });
+      for (const c of cambios) {
+        const previo = cercania.get(c.unidadId);
+        cercania.set(c.unidadId, { sector: c.sector?.trim() || null, posicion: c.posicion,
+                                   piso: c.piso === undefined ? previo?.piso ?? null : c.piso?.trim() || null });
+      }
       return cambios.length;
     },
     async emitirAlerta(n: NuevaAlerta): Promise<AlertaVecinal> {

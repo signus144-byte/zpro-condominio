@@ -16,8 +16,9 @@ import { ElegirCondominio, Entrar, MiCuenta, OlvideClave, Registro, RestablecerC
 import { Accesos, AdminAvisos, Conciliacion, FacturaZentaPro, TasaBcv } from './screens/presidencia/Admin';
 import { destino } from './navegacion';
 import { Notificaciones } from './components/notificaciones';
+import { GruposCasas, MensajesMasivos, NotificacionCompleta } from './screens/presidencia/Difusion';
 import { ChatVecinos } from './screens/presidencia/Admin';
-import { CapaAlarma, ConfigAlertaJunta, DetalleAlerta, HistorialAlertas, Participacion, Sos } from './screens/alerta/Alerta';
+import { CapaAlarma, ConfigAlertaJunta, DetalleAlerta, HistorialAlertas, Participacion, Sos, UbicacionCasas } from './screens/alerta/Alerta';
 import { Invitar } from './screens/presidencia/Invitar';
 import { Invitacion } from './screens/cuenta/Invitacion';
 import { SoloOtraApp } from './screens/cuenta/Cuenta';
@@ -128,6 +129,7 @@ export default function App() {
         <Route path="/r/chats/:id" element={<ProtegidaSola junta={false}><SalaChat /></ProtegidaSola>} />
         <Route path="/r/directorio" element={<Protegida junta={false} titulo="Directorio de casas"><Directorio /></Protegida>} />
         <Route path="/r/notificaciones" element={<Protegida junta={false} titulo="Notificaciones"><Notificaciones /></Protegida>} />
+        <Route path="/r/notificacion/:id" element={<Protegida junta={false} titulo="Mensaje"><NotificacionCompleta /></Protegida>} />
         <Route path="/r/documentos" element={<Protegida junta={false} titulo="Documentos"><DocumentosResidente /></Protegida>} />
         <Route path="/p" element={<Protegida junta titulo="Panel financiero"><Panel /></Protegida>} />
         <Route path="/p/pagos" element={<Protegida junta titulo="Pagos"><PagosPresidencia /></Protegida>} />
@@ -147,6 +149,10 @@ export default function App() {
         <Route path="/p/zentapro" element={<Protegida junta titulo="Mensualidad de ZentaPro"><FacturaZentaPro /></Protegida>} />
         <Route path="/p/avisos" element={<Protegida junta titulo="Avisos"><AdminAvisos /></Protegida>} />
         <Route path="/p/notificaciones" element={<Protegida junta titulo="Notificaciones"><Notificaciones /></Protegida>} />
+        <Route path="/p/notificacion/:id" element={<Protegida junta titulo="Mensaje"><NotificacionCompleta /></Protegida>} />
+        <Route path="/p/mensajes" element={<Protegida junta titulo="Mensajes masivos"><MensajesMasivos /></Protegida>} />
+        <Route path="/p/grupos" element={<Protegida junta titulo="Grupos de casas"><GruposCasas /></Protegida>} />
+        <Route path="/p/ubicacion" element={<Protegida junta titulo="Ubicación de las casas"><UbicacionCasas /></Protegida>} />
         <Route path="/p/chat-vecinos" element={<Protegida junta titulo="Chat entre vecinos"><ChatVecinos /></Protegida>} />
         <Route path="/p/tasa" element={<Protegida junta titulo="Tasa BCV"><TasaBcv /></Protegida>} />
         <Route path="*" element={<Navigate to={destino()} replace />} />

@@ -84,8 +84,9 @@
 /* Configuración de la junta */
 .cercania-tabla input { width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--linea); border-radius: 8px; background: var(--superficie); }
 .tabla.cercania-tabla td { vertical-align: middle; }
-.cercania-tabla td:nth-child(2) { width: 34%; padding-left: 8px; }
-.cercania-tabla td:nth-child(3) { width: 26%; padding-left: 8px; }
+.cercania-tabla td:nth-child(2) { width: 30%; padding-left: 6px; }
+.cercania-tabla td:nth-child(3) { width: 20%; padding-left: 6px; }
+.cercania-tabla td:nth-child(4) { width: 17%; padding-left: 6px; }
 .radio-control { display: flex; align-items: center; gap: 10px; }
 .radio-control input[type=range] { flex: 1; accent-color: var(--sos); }
 .radio-control output { min-width: 2.5em; text-align: center; font-weight: 750; font-size: 1.2rem; }

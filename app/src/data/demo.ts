@@ -7,7 +7,9 @@ import type {
   Partida, Reporte, Sesion, TipoDocumento, Unidad, Visibilidad,
   CodigoAcceso, ComentarioReporte, FacturaZentaPro, MovimientoBancario, Rol, SolicitudIngresoJunta, Yo,
   Notificacion, TipoNotificacion,
+  AlcanceCasas, AlcanceDifusion, Difusion, GrupoUnidades,
 } from './tipos';
+import type { DifusionEnviada } from './api';
 import { crearChatDemo, etiquetaChat } from './demoChat';
 import { crearAlertaDemo } from './demoAlerta';
 
@@ -54,6 +56,10 @@ const cargos: Cargo[] = [];
 const pagos: (Pago & { cuentaDestinoId: string | null })[] = [];
 const recibosEmitidos = new Set<string>();
 const partidas: Partida[] = [];
+/** Casas a las que aplica cada cuota especial (sin entrada = todo el condominio). Igual que partida_unidades. */
+const incluidas = new Map<string, string[]>();
+const casasDe = (p: Pick<Partida, 'id'>) => incluidas.get(p.id) ?? unidades.map((u) => u.id);
+const meIncluye = (p: Pick<Partida, 'id'>, uid: string | null | undefined) => !!uid && casasDe(p).includes(uid);
 const votos: { votacionId: string; unidadId: string; opcionId: string }[] = [];
 const reportes: (Reporte & { autorId: string | null; autorPrivado: string })[] = [];
 const avisos: Aviso[] = [
@@ -87,6 +93,7 @@ function emitirRecibos(periodo: string): number {
     if (fondo > 0) cargos.push({ id: id(), unidadId: u.id, periodo, tipo: 'fondo_reserva', concepto: `Fondo de reserva ${condominio.fondoReservaPct}%`, montoUsd: r2(fondo * u.alicuota / 100) });
     for (const p of partidas) {
       if (!['aprobada', 'en_ejecucion'].includes(p.estado) || !p.primeraCuota) continue;
+      if (!meIncluye(p, u.id)) continue;                      // la cuota se cobra solo a las casas incluidas
       const idx = mesesEntre(p.primeraCuota, periodo);
       if (idx < 0 || idx >= p.numeroCuotas) continue;
       cargos.push({ id: id(), unidadId: u.id, periodo, tipo: 'extraordinaria', concepto: `${p.titulo} (cuota ${idx + 1}/${p.numeroCuotas})`, montoUsd: cuotaDe(p, u) });
@@ -101,21 +108,25 @@ function emitirRecibos(periodo: string): number {
 function mesesEntre(desde: string, hasta: string) {
   return (Number(hasta.slice(0, 4)) - Number(desde.slice(0, 4))) * 12 + Number(hasta.slice(5, 7)) - Number(desde.slice(5, 7));
 }
-function cuotaDe(p: Pick<Partida, 'presupuestoUsd' | 'numeroCuotas' | 'reparto'>, u: Unidad) {
-  return p.reparto === 'alicuota' ? r2(p.presupuestoUsd / p.numeroCuotas * u.alicuota / 100) : r2(p.presupuestoUsd / p.numeroCuotas / unidades.length);
+/** Cuota de una casa: repartida solo entre las casas incluidas (por alícuota relativa o en partes iguales). */
+function cuotaDe(p: Pick<Partida, 'id' | 'presupuestoUsd' | 'numeroCuotas' | 'reparto'>, u: Unidad) {
+  const casas = casasDe(p).map(unidad);
+  const base = incluidas.has(p.id) ? casas.reduce((s, x) => s + x.alicuota, 0) : 100;
+  return p.reparto === 'alicuota' ? r2(p.presupuestoUsd / p.numeroCuotas * u.alicuota / base) : r2(p.presupuestoUsd / p.numeroCuotas / casas.length);
 }
+const TODOS: Partida['alcance'] = { tipo: 'todos', nombre: null, unidades: 8 };
 
 // Partida aprobada (ya cobrándose) + partida en votación.
 partidas.push({
   id: id(), titulo: 'Impermeabilización techo Bloque A', descripcion: 'Filtraciones en apartamentos del último piso.',
   presupuestoUsd: 2400, numeroCuotas: 4, primeraCuota: ANTERIOR, reparto: 'alicuota', estado: 'en_ejecucion',
-  creadoEn: ANTERIOR, votacion: null, cuotaMiUnidadUsd: null,
+  creadoEn: ANTERIOR, votacion: null, cuotaMiUnidadUsd: null, alcance: TODOS, meAfecta: false,
 });
 const votPintura = { id: id(), opA: id(), opR: id() };
 partidas.push({
   id: id(), titulo: 'Pintura de fachada Bloque B', descripcion: 'Pintura exterior y reparación de grietas. 3 presupuestos recibidos; el más bajo es de $3.000.',
   presupuestoUsd: 3000, numeroCuotas: 3, primeraCuota: mesSiguiente(PERIODO), reparto: 'alicuota', estado: 'en_votacion',
-  creadoEn: hoy(), cuotaMiUnidadUsd: null,
+  creadoEn: hoy(), cuotaMiUnidadUsd: null, alcance: TODOS, meAfecta: false,
   votacion: {
     id: votPintura.id, titulo: '¿Aprueba la pintura de la fachada del Bloque B?', ponderacion: 'alicuota', umbralPct: 50.01,
     estado: 'abierta', cierraEn: null, miVotoOpcionId: null,
@@ -125,6 +136,24 @@ partidas.push({
     ],
   },
 });
+// Cuota solo para la calle A (portón eléctrico propio): las casas del bloque B ni la ven.
+const votPorton = { id: id(), opA: id(), opR: id(), partida: id() };
+partidas.push({
+  id: votPorton.partida, titulo: 'Motor del portón de la calle A', descripcion: 'El motor del portón eléctrico de la calle A se quemó. Presupuesto más bajo: $480.',
+  presupuestoUsd: 480, numeroCuotas: 2, primeraCuota: mesSiguiente(PERIODO), reparto: 'unidad', estado: 'en_votacion',
+  creadoEn: new Date(Date.now() - 86_400_000).toISOString(), cuotaMiUnidadUsd: null,
+  alcance: { tipo: 'unidades', nombre: 'Calle A · portón', unidades: 4 }, meAfecta: false,
+  votacion: {
+    id: votPorton.id, titulo: '¿Aprueba: Motor del portón de la calle A?', ponderacion: 'unidad', umbralPct: 50.01,
+    estado: 'abierta', cierraEn: null, miVotoOpcionId: null,
+    opciones: [
+      { id: votPorton.opA, texto: 'Aprobar', orden: 0, unidades: 0, pesoPct: 0 },
+      { id: votPorton.opR, texto: 'Rechazar', orden: 1, unidades: 0, pesoPct: 0 },
+    ],
+  },
+});
+incluidas.set(votPorton.partida, ['u-A11', 'u-A12', 'u-A13', 'u-A14']);
+votos.push({ votacionId: votPorton.id, unidadId: 'u-A11', opcionId: votPorton.opA });
 votos.push({ votacionId: votPintura.id, unidadId: 'u-B31', opcionId: votPintura.opA },
            { votacionId: votPintura.id, unidadId: 'u-A11', opcionId: votPintura.opA },
            { votacionId: votPintura.id, unidadId: 'u-A12', opcionId: votPintura.opR });
@@ -179,21 +208,31 @@ let sesion: Sesion | null = null;
 const exigir = () => { if (!sesion) throw new Error('Inicie sesión'); return sesion; };
 const exigirFinanzas = () => { const s = exigir(); if (!s.manejaFinanzas) throw new Error('Sin permiso'); return s; };
 
+/** ¿Puede la sesión ver esta cuota especial? La junta siempre; los demás solo si es de todos o incluye una de sus casas. */
+function puedeVerPartida(p: Partida, s: Sesion) {
+  return s.esJunta || (p.estado !== 'borrador' && (!incluidas.has(p.id) || meIncluye(p, s.unidadId)));
+}
 function vistaPartida(p: Partida): Partida {
   const s = sesion;
   const v = p.votacion;
-  const u = s?.unidadId ? unidad(s.unidadId) : null;
+  const u = s?.unidadId && meIncluye(p, s.unidadId) ? unidad(s.unidadId) : null;
+  const casas = casasDe(p);
+  const totalAlic = casas.reduce((x, c) => x + unidad(c).alicuota, 0) || 100;
   return {
     ...p,
+    alcance: { tipo: incluidas.has(p.id) ? 'unidades' : 'todos', nombre: incluidas.has(p.id) ? p.alcance.nombre : null, unidades: casas.length },
+    meAfecta: !!u,
     cuotaMiUnidadUsd: u ? cuotaDe(p, u) : null,
+    ...(s?.esJunta ? { unidadIds: [...casas] } : {}),
     votacion: v && {
       ...v,
       miVotoOpcionId: u ? votos.find((x) => x.votacionId === v.id && x.unidadId === u.id)?.opcionId ?? null : null,
+      sinVotar: s?.esJunta ? casas.filter((c) => !votos.some((x) => x.votacionId === v.id && x.unidadId === c)).length : null,
       opciones: v.opciones.map((o) => {
-        const vs = votos.filter((x) => x.votacionId === v.id && x.opcionId === o.id);
+        const vs = votos.filter((x) => x.votacionId === v.id && x.opcionId === o.id && casas.includes(x.unidadId));
         const peso = v.ponderacion === 'alicuota'
-          ? vs.reduce((s2, x) => s2 + unidad(x.unidadId).alicuota, 0)
-          : 100 * vs.length / unidades.length;
+          ? 100 * vs.reduce((s2, x) => s2 + unidad(x.unidadId).alicuota, 0) / totalAlic
+          : 100 * vs.length / casas.length;
         return { ...o, unidades: vs.length, pesoPct: r2(peso) };
       }),
     },
@@ -373,6 +412,80 @@ const alerta = crearAlertaDemo({
     }
   },
 });
+
+// ---------- Grupos de casas y mensajes masivos ----------
+const gruposDemo: GrupoUnidades[] = [
+  { id: id(), nombre: 'Calle A · portón', descripcion: 'Casas detrás del portón eléctrico de la calle A', unidadIds: ['u-A11', 'u-A12', 'u-A13', 'u-A14'] },
+  { id: id(), nombre: 'Torre B · piso 3', descripcion: 'Apartamentos con la llave del piso 3', unidadIds: ['u-B31', 'u-B32', 'u-B33', 'u-B34'] },
+];
+const difusionesDemo: Difusion[] = [];
+const normal = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').replace(/\s+/g, ' ').trim();
+function validarGrupo(g: { nombre: string; unidadIds: string[] }) {
+  if (g.nombre.trim().length < 2) throw new Error('Escriba el nombre del grupo');
+  if (!g.unidadIds.length) throw new Error('Elija al menos una casa');
+  if (g.unidadIds.some((u) => !unidades.some((x) => x.id === u))) throw new Error('Alguna casa no pertenece a este condominio');
+}
+/** Igual que resolverAlcance() del servidor: lista de casas y nombre legible; todas las casas = todo el condominio. */
+function resolverAlcance(a: AlcanceCasas): { tipo: 'todos' | 'unidades'; nombre: string | null; unidadIds: string[] } {
+  if (a.tipo === 'todos') return { tipo: 'todos', nombre: null, unidadIds: [] };
+  if (a.tipo === 'grupo') {
+    const g = gruposDemo.find((x) => x.id === a.grupoId);
+    if (!g) throw new Error('Ese grupo no existe');
+    if (!g.unidadIds.length) throw new Error('Ese grupo no tiene casas');
+    return { tipo: 'unidades', nombre: g.nombre, unidadIds: [...g.unidadIds] };
+  }
+  const ids = [...new Set(a.unidadIds)];
+  if (!ids.length) throw new Error('Elija al menos una casa');
+  if (ids.some((u) => !unidades.some((x) => x.id === u))) throw new Error('Alguna casa no pertenece a este condominio');
+  if (ids.length === unidades.length) return { tipo: 'todos', nombre: null, unidadIds: [] };
+  const et = unidades.filter((u) => ids.includes(u.id)).map((u) => etqU(u.id)!);
+  const nombre = a.nombre?.trim() || (ids.length <= 3 ? et.join(', ') : `${et.slice(0, 2).join(', ')} y ${ids.length - 2} casas más`);
+  return { tipo: 'unidades', nombre, unidadIds: ids };
+}
+function unidadesDifusion(a: AlcanceDifusion): string[] {
+  switch (a.tipo) {
+    case 'todos': return unidades.map((u) => u.id);
+    case 'grupo': { const g = gruposDemo.find((x) => x.id === a.grupoId); if (!g) throw new Error('Ese grupo no existe'); return [...g.unidadIds]; }
+    case 'unidades': return [...new Set(a.unidadIds)].filter((u) => unidades.some((x) => x.id === u));
+    case 'partida':
+    case 'sin_votar': {
+      const p = partidas.find((x) => x.id === a.partidaId);
+      if (!p) throw new Error('Esa cuota especial no existe');
+      if (a.tipo === 'partida') return casasDe(p);
+      const v = p.votacion;
+      if (!v || v.estado !== 'abierta') throw new Error('Esa cuota especial no tiene una votación abierta');
+      return casasDe(p).filter((c) => !votos.some((x) => x.votacionId === v.id && x.unidadId === c));
+    }
+  }
+}
+function personasDe(casas: string[], soloPropietarios: boolean, excepto: string) {
+  return [...new Set(miembrosDemo.filter((m) => m.activo && m.unidadId && casas.includes(m.unidadId) && m.usuarioId !== excepto
+    && (!soloPropietarios || m.rol === 'propietario')).map((m) => m.usuarioId))];
+}
+function enviarDifusion(s: Sesion, d: { titulo: string; cuerpo: string; alcance: AlcanceDifusion; soloPropietarios?: boolean; partidaId?: string }): DifusionEnviada {
+  if (difusionesDemo.filter((x) => Date.now() - new Date(x.creadoEn).getTime() < 86_400_000).length >= 20) {
+    throw new Error('Límite de 20 mensajes masivos por día alcanzado');
+  }
+  const casas = unidadesDifusion(d.alcance);
+  if (!casas.length) throw new Error('No hay casas en ese alcance');
+  const personas = personasDe(casas, !!d.soloPropietarios, s.usuarioId);
+  const partidaId = d.alcance.tipo === 'partida' || d.alcance.tipo === 'sin_votar' ? d.alcance.partidaId : d.partidaId ?? null;
+  const p = partidaId ? partidas.find((x) => x.id === partidaId) : null;
+  const alcanceNombre = d.alcance.tipo === 'todos' ? 'Todo el condominio'
+    : d.alcance.tipo === 'grupo' ? gruposDemo.find((g) => g.id === (d.alcance as { grupoId: string }).grupoId)?.nombre ?? 'Grupo'
+    : d.alcance.tipo === 'unidades' ? `${casas.length} ${casas.length === 1 ? 'casa elegida' : 'casas elegidas'}`
+    : d.alcance.tipo === 'partida' ? (p && incluidas.has(p.id) ? p.alcance.nombre ?? 'Casas de la cuota especial' : 'Todo el condominio')
+    : 'Casas que aún no han votado';
+  const dif: Difusion = {
+    id: id(), titulo: d.titulo.trim(), cuerpo: d.cuerpo.trim(), alcance: d.alcance.tipo, alcanceNombre, partidaId,
+    soloPropietarios: !!d.soloPropietarios, unidades: casas.length, personas: personas.length,
+    creadoEn: new Date().toISOString(), creadoPor: s.nombre,
+  };
+  difusionesDemo.push(dif);
+  notificar(personas, 'difusion', dif.titulo, dif.cuerpo,
+    { difusionId: dif.id, pantalla: partidaId ? 'partidas' : 'avisos', ...(partidaId ? { partidaId } : {}) });
+  return { id: dif.id, unidades: casas.length, personas: personas.length };
+}
 
 export const demoApi: Api = {
   modo: 'demo',
@@ -708,27 +821,49 @@ export const demoApi: Api = {
 
   async partidas() {
     const s = exigir();
-    return partidas.filter((p) => s.esJunta || p.estado !== 'borrador').map(vistaPartida)
+    return partidas.filter((p) => puedeVerPartida(p, s)).map(vistaPartida)
       .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
   },
   async crearPartida(np) {
     const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    await espera();
+    const al = resolverAlcance(np.alcance ?? { tipo: 'todos' });
+    const pid = id();
+    if (al.tipo === 'unidades') incluidas.set(pid, al.unidadIds);
     partidas.push({
-      id: id(), titulo: np.titulo, descripcion: np.descripcion, presupuestoUsd: np.presupuestoUsd,
+      id: pid, titulo: np.titulo, descripcion: np.descripcion, presupuestoUsd: np.presupuestoUsd,
       numeroCuotas: np.numeroCuotas, primeraCuota: np.primeraCuota, reparto: np.reparto,
       estado: np.someterAVotacion ? 'en_votacion' : 'aprobada', creadoEn: new Date().toISOString(), cuotaMiUnidadUsd: null,
+      alcance: { tipo: al.tipo, nombre: al.nombre, unidades: al.tipo === 'todos' ? unidades.length : al.unidadIds.length }, meAfecta: false,
       votacion: np.someterAVotacion ? {
         id: id(), titulo: `¿Aprueba: ${np.titulo}?`, ponderacion: np.reparto, umbralPct: np.umbralPct, estado: 'abierta',
         cierraEn: np.cierraEn, miVotoOpcionId: null,
         opciones: [{ id: id(), texto: 'Aprobar', orden: 0, unidades: 0, pesoPct: 0 }, { id: id(), texto: 'Rechazar', orden: 1, unidades: 0, pesoPct: 0 }],
       } : null,
     });
+    let difusion: DifusionEnviada | null = null;
+    if (np.difundir !== false) {
+      const quien = al.tipo === 'todos' ? 'todo el condominio' : (al.nombre ?? 'algunas casas');
+      const cuotas = `${np.numeroCuotas} ${np.numeroCuotas === 1 ? 'cuota' : 'cuotas'}`;
+      const monto = `$${np.presupuestoUsd.toLocaleString('es-VE', { maximumFractionDigits: 2 })}`;
+      const cuerpo = (np.someterAVotacion
+        ? `La junta propone la cuota especial "${np.titulo}" por ${monto} en ${cuotas}, para ${quien}. Los propietarios pueden votar desde la app.`
+        : `La junta aprobó la cuota especial "${np.titulo}" por ${monto} en ${cuotas}, para ${quien}.`)
+        + (np.descripcion ? ` ${np.descripcion.slice(0, 600)}` : '');
+      difusion = enviarDifusion(s, {
+        titulo: (np.someterAVotacion ? `Votación: ${np.titulo}` : `Cuota especial: ${np.titulo}`).slice(0, 120),
+        cuerpo: cuerpo.slice(0, 2000), alcance: { tipo: 'partida', partidaId: pid },
+      });
+    }
+    return { id: pid, difusion };
   },
   async votar(vid, oid) {
     const s = exigir();
     if (s.rol !== 'propietario' || !s.unidadId) throw new Error('Solo el propietario de la unidad puede votar');
     const p = partidas.find((x) => x.votacion?.id === vid);
-    if (!p || p.votacion!.estado !== 'abierta') throw new Error('La votación no está abierta');
+    if (!p || !puedeVerPartida(p, s)) throw new Error('Votación no existe');
+    if (!meIncluye(p, s.unidadId)) throw new Error(`Esta votación es solo para ${p.alcance.nombre ?? 'las casas incluidas'}`);
+    if (p.votacion!.estado !== 'abierta') throw new Error('La votación no está abierta');
     if (votos.some((x) => x.votacionId === vid && x.unidadId === s.unidadId)) throw new Error('Su unidad ya votó');
     votos.push({ votacionId: vid, unidadId: s.unidadId, opcionId: oid });
   },
@@ -820,7 +955,7 @@ export const demoApi: Api = {
     if (!s.esJunta) throw new Error('Sin permiso');
     const p = partidas.find((x) => x.votacion?.id === vid);
     if (!p) throw new Error('Votación no existe');
-    return unidades.map((u) => {
+    return unidades.filter((u) => meIncluye(p, u.id)).map((u) => {
       const v = votos.find((x) => x.votacionId === vid && x.unidadId === u.id);
       const op = v ? p.votacion!.opciones.find((o) => o.id === v.opcionId) : null;
       return {
@@ -851,6 +986,55 @@ export const demoApi: Api = {
   suspenderDeAlerta: alerta.suspenderDeAlerta,
   cercania: alerta.cercania,
   fijarCercania: alerta.fijarCercania,
+
+  // ---- Grupos de casas y mensajes masivos (mismas reglas que 0021_alcance_y_difusion.sql) ----
+  async unidadesAlcance() {
+    const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    return unidades.map((u) => ({ id: u.id, etiqueta: etqU(u.id)!, bloque: u.bloque, ...alerta.ubicacion(u.id), alicuota: u.alicuota }));
+  },
+  async grupos() {
+    const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    return gruposDemo.map((g) => ({ ...g, unidadIds: [...g.unidadIds] })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  },
+  async crearGrupo(g) {
+    const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    validarGrupo(g);
+    if (gruposDemo.some((x) => normal(x.nombre) === normal(g.nombre))) throw new Error('Ya existe un grupo con ese nombre');
+    const nuevo: GrupoUnidades = { id: id(), nombre: g.nombre.trim(), descripcion: g.descripcion?.trim() || null, unidadIds: [...new Set(g.unidadIds)] };
+    gruposDemo.push(nuevo);
+    return { ...nuevo };
+  },
+  async editarGrupo(gid, g) {
+    const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    validarGrupo(g);
+    const x = gruposDemo.find((y) => y.id === gid);
+    if (!x) throw new Error('Grupo no existe');
+    if (gruposDemo.some((y) => y.id !== gid && normal(y.nombre) === normal(g.nombre))) throw new Error('Ya existe un grupo con ese nombre');
+    Object.assign(x, { nombre: g.nombre.trim(), descripcion: g.descripcion?.trim() || null, unidadIds: [...new Set(g.unidadIds)] });
+    return { ...x };
+  },
+  async borrarGrupo(gid) {
+    const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    const i = gruposDemo.findIndex((y) => y.id === gid);
+    if (i < 0) throw new Error('Grupo no existe');
+    gruposDemo.splice(i, 1);
+  },
+  async previaDifusion(alcance, soloPropietarios) {
+    const s = exigir(); if (!s.esJunta) throw new Error('Solo la junta envía mensajes masivos');
+    const casas = unidadesDifusion(alcance);
+    return { unidades: casas.length, personas: personasDe(casas, soloPropietarios, s.usuarioId).length };
+  },
+  async difundir(d) {
+    const s = exigir(); if (!s.esJunta) throw new Error('Solo la junta envía mensajes masivos');
+    await espera();
+    if (d.titulo.trim().length < 3) throw new Error('Escriba un título');
+    if (d.cuerpo.trim().length < 3) throw new Error('Escriba el mensaje');
+    return enviarDifusion(s, d);
+  },
+  async difusiones() {
+    const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    return [...difusionesDemo].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+  },
   emitirAlerta: alerta.emitirAlerta,
   alertas: alerta.alertas,
   alerta: alerta.alerta,
