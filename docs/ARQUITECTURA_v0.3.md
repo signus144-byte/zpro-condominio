@@ -102,3 +102,34 @@ A diferencia del plan anterior (Supabase), **el chat en tiempo real sí cabe en 
 | **Quién paga** | Solo esas casas: el presupuesto se reparte entre ellas por su alícuota relativa o en partes iguales |
 | **Mensajes masivos** | A todo el condominio, un grupo, casas elegidas, las casas de una cuota o solo las que no han votado; solo propietarios si se desea; vista previa de alcance; historial; máximo 20 por día. Llegan como notificación (app, push y correo) |
 | **WhatsApp** | La app arma el texto para que la junta lo comparta en el grupo del condominio (WhatsApp no permite enviar mensajes masivos automáticos sin una cuenta empresarial verificada) |
+
+## 9. Dinero: tasa BCV garantizada, pago por concepto y cierre del mes (v0.7)
+
+**Tasa BCV (0022_tasa_verificada.sql).** Un pago en bolívares se convierte con la tasa del día del pago, así que la tasa no puede estar equivocada.
+- Cada 30 minutos, todos los días (y al arrancar el servidor), se lee la página del BCV y DolarApi; cada lectura queda en `lecturas_tasa`.
+- `consolidar_tasa()` solo acepta una tasa cuando **dos fuentes distintas dan el mismo valor (± 0,01 %)**. La fecha valor la da el BCV.
+- La junta (todas sus personas juntas) cuenta como una fuente; Technical Digital TD, como otra.
+- `tasas_bcv.vigente_hasta` registra hasta qué día se comprobó que esa tasa seguía rigiendo. La tasa del viernes en la tarde rige desde el lunes; el fin de semana sigue la del viernes.
+- `tasa_para(fecha)` devuelve la tasa que rige ese día o nada. El disparador de `pagos` rechaza un pago en Bs sin tasa verificada para su fecha.
+- La app consulta la tasa al abrir la pantalla de pago, al volver a la app y justo antes de enviar. Sin internet o sin tasa, no muestra montos en Bs ni deja enviar el pago (en dólares sí).
+- Si a las 9:05 no hay tasa confirmada, la junta recibe un aviso.
+- El certificado del BCV a veces llega sin la cadena intermedia: se puede agregar con `BCV_CA_EXTRA`. Nunca se apaga la verificación TLS.
+
+**Pago por concepto (0023).**
+- `pago_destinos` guarda lo que eligió el vecino (o la junta al aprobar).
+- `pago_aplicaciones` guarda cómo quedó descontado. `reaplicar_pagos_unidad()` lo recalcula completo y de forma determinista, por unidad:
+  1. Cada pago aprobado, en orden de aprobación, cubre primero lo elegido.
+  2. Lo que sobra (y las notas de crédito) cubre la deuda más antigua: ordinaria → fondo → no común → multa → cuota especial.
+  3. Lo que aún sobra queda a favor y cubre solo los cargos nuevos.
+- Se recalcula al aprobar, rechazar o borrar pagos y al crear o borrar cargos. `generar_recibos` lo hace una vez al final.
+- `cargos_estado` da pagado / parcial / pendiente.
+- `avance_partidas()` (todos los que ven la cuota) y `cobro_partida()` (solo la junta).
+
+**Reporte y cierre del mes.**
+- `reporte_mensual(cid, periodo)` arma un JSON con:
+  - saldos por casa al cierre (cargos del mes o antes − pagos aprobados con fecha de pago hasta fin de mes);
+  - pagos del mes con su estado y a qué se aplicaron;
+  - gastos, movimiento de cada cuenta en su moneda, fondo de reserva y avance de las cuotas especiales.
+- `cerrar_mes()` guarda ese JSON en `cierres_mensuales`. Solo se cierran meses terminados, y se puede volver a cerrar.
+- `cierre_automatico()` cierra el mes anterior el día 1 a las 7:30.
+- La app genera el PDF (para firma y sello), el Excel (Resumen, Casas, Pagos, Gastos, Libro, Cuentas y Cuotas especiales) y el libro de ingresos y egresos.
