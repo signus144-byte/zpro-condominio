@@ -3,8 +3,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type {
-  DatosPagoZentaPro, EstadoCuenta, FacturaZentaPro, Gasto, MovimientoBancario, Pago, ResultadoExtracto,
-  ResumenPanel, UnidadConSaldo,
+  AplicacionPago, CierreMes, DatosPagoZentaPro, EstadoCuenta, FacturaZentaPro, Gasto, MovimientoBancario, Pago,
+  ReporteDelMes, ResultadoExtracto, ResumenPanel, UnidadConSaldo,
 } from '../../../compartido/tipos.js';
 import { bd, type Contexto } from '../contexto.js';
 import type { Tx } from '../db/conexion.js';
@@ -18,6 +18,40 @@ const Moneda = z.enum(['USD', 'VES']);
 const Fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'debe ser AAAA-MM-DD');
 const Monto = z.coerce.number().positive().max(1e12);
 const opt = (s: string | undefined) => (s === undefined || s.trim() === '' ? undefined : s.trim());
+/** cargoIds en un formulario: '["id1","id2"]' o 'id1,id2'. */
+function listaIds(v: string | undefined): string[] | undefined {
+  const t = opt(v);
+  if (!t) return undefined;
+  if (t.startsWith('[')) { try { return JSON.parse(t) as string[]; } catch { return ['x']; } }   // 'x' → falla la validación
+  return t.split(',').map((x) => x.trim()).filter(Boolean);
+}
+
+type MapaAplic = Map<string, AplicacionPago[]>;
+/** Lo que se eligió pagar (destinos) y cómo quedó descontado (aplicaciones) de varios pagos de una vez. */
+async function destinosYAplicaciones(c: Tx, ids: string[]): Promise<{ destinos: MapaAplic; aplicaciones: MapaAplic }> {
+  const destinos: MapaAplic = new Map(); const aplicaciones: MapaAplic = new Map();
+  if (!ids.length) return { destinos, aplicaciones };
+  const meter = (m: MapaAplic, k: string, a: AplicacionPago) => m.set(k, [...(m.get(k) ?? []), a]);
+  for (const r of (await c.query(`
+      select d.pago_id, c.id, c.concepto, c.periodo, e.pendiente_usd from pago_destinos d
+        join cargos c on c.id = d.cargo_id join cargos_estado e on e.id = c.id
+       where d.pago_id = any($1::uuid[]) order by d.orden`, [ids])).rows) {
+    meter(destinos, r.pago_id, { cargoId: r.id, concepto: r.concepto, periodo: r.periodo, montoUsd: num(r.pendiente_usd) });
+  }
+  for (const r of (await c.query(`
+      select a.pago_id, c.id, c.concepto, c.periodo, a.monto_usd from pago_aplicaciones a join cargos c on c.id = a.cargo_id
+       where a.pago_id = any($1::uuid[]) order by c.periodo, prioridad_cargo(c.tipo)`, [ids])).rows) {
+    meter(aplicaciones, r.pago_id, { cargoId: r.id, concepto: r.concepto, periodo: r.periodo, montoUsd: num(r.monto_usd) });
+  }
+  return { destinos, aplicaciones };
+}
+
+async function mapPagos(ctx: Contexto, c: Tx, filas: Record<string, any>[]): Promise<Pago[]> {
+  const { destinos, aplicaciones } = await destinosYAplicaciones(c, filas.map((p) => p.id));
+  return Promise.all(filas.map(async (p) => ({
+    ...(await mapPago(ctx, p)), destinos: destinos.get(p.id) ?? [], aplicaciones: aplicaciones.get(p.id) ?? [],
+  })));
+}
 
 async function mapPago(ctx: Contexto, p: Record<string, any>): Promise<Pago> {
   return {
@@ -43,13 +77,16 @@ export async function estadoCuenta(ctx: Contexto, c: Tx, cid: string, uid: strin
   const u = (await c.query(`select * from unidades where id = $1 and condominio_id = $2`, [uid, cid])).rows[0];
   if (!u) throw new ErrorApi(404, 'Unidad no existe', 'no_encontrado');
   await exigir(c, 'es_junta($1) or es_de_mi_unidad($2)', [cid, uid], 'Solo puede ver el estado de cuenta de su unidad');
-  const cargos = (await c.query(`select * from cargos where unidad_id = $1 order by periodo desc, tipo`, [uid])).rows;
+  const cargos = (await c.query(`select * from cargos_estado where unidad_id = $1 order by periodo desc, prioridad_cargo(tipo), creado_en`, [uid])).rows;
   const pagos = (await c.query(`${SELECT_PAGO} where p.unidad_id = $1 order by p.creado_en desc`, [uid])).rows;
   const saldo = (await c.query(`select saldo_usd from estado_cuenta_unidad where unidad_id = $1`, [uid])).rows[0];
   return {
     unidad: { id: u.id, bloque: u.bloque, numero: u.numero, alicuota: num(u.alicuota), propietario: u.propietario_nombre },
-    cargos: cargos.map((x) => ({ id: x.id, unidadId: x.unidad_id, periodo: x.periodo, tipo: x.tipo, concepto: x.concepto, montoUsd: num(x.monto_usd) })),
-    pagos: await Promise.all(pagos.map((p) => mapPago(ctx, p))),
+    cargos: cargos.map((x) => ({
+      id: x.id, unidadId: x.unidad_id, periodo: x.periodo, tipo: x.tipo, concepto: x.concepto, montoUsd: num(x.monto_usd),
+      pagadoUsd: num(x.pagado_usd), pendienteUsd: num(x.pendiente_usd), estado: x.estado, partidaId: x.partida_id,
+    })),
+    pagos: await mapPagos(ctx, c, pagos),
     saldoUsd: num(saldo?.saldo_usd),
   };
 }
@@ -104,13 +141,14 @@ export default async function rutasFinanzas(app: FastifyInstance) {
   // ---------- Pagos ----------
   app.get('/c/:cid/pagos', async (req): Promise<Pago[]> => {
     const { cid } = ParamsC.parse(req.params);
-    const { estado } = z.object({ estado: z.enum(['reportado', 'todos']).default('todos') }).parse(req.query);
-    const filas = await bd(req, async (c) => {
+    const { estado, mes } = z.object({ estado: z.enum(['reportado', 'todos']).default('todos'), mes: Periodo.optional() }).parse(req.query);
+    return bd(req, async (c) => {
       await exigirJunta(c, cid);
-      return (await c.query(`${SELECT_PAGO} where p.condominio_id = $1 and ($2 = 'todos' or p.estado = 'reportado')
-                             order by p.creado_en desc limit 500`, [cid, estado])).rows;
+      const filas = (await c.query(`${SELECT_PAGO} where p.condominio_id = $1 and ($2 = 'todos' or p.estado = 'reportado')
+                             and ($3::date is null or p.fecha_pago between $3::date and ($3::date + interval '1 month' - interval '1 day')::date)
+                             order by p.creado_en desc limit 1000`, [cid, estado, mes ?? null])).rows;
+      return mapPagos(ctx, c, filas);
     });
-    return Promise.all(filas.map((p) => mapPago(ctx, p)));
   });
 
   app.post('/c/:cid/pagos', async (req, rep) => {
@@ -120,8 +158,9 @@ export default async function rutasFinanzas(app: FastifyInstance) {
       unidadId: Uuid, fechaPago: Fecha, metodo: Metodo, moneda: Moneda, monto: Monto,
       referencia: z.string().max(40).optional(), bancoOrigen: z.string().max(60).optional(),
       cuentaDestinoId: Uuid.optional(), nota: z.string().max(500).optional(),
+      cargoIds: z.array(Uuid).max(60).optional(),
     }).parse({ ...campos, referencia: opt(campos.referencia), bancoOrigen: opt(campos.bancoOrigen),
-               cuentaDestinoId: opt(campos.cuentaDestinoId), nota: opt(campos.nota) });
+               cuentaDestinoId: opt(campos.cuentaDestinoId), nota: opt(campos.nota), cargoIds: listaIds(campos.cargoIds) });
     if (d.fechaPago > new Date().toISOString().slice(0, 10)) throw new ErrorApi(400, 'La fecha del pago no puede ser futura', 'invalido');
     const comp = archivos.comprobante?.[0];
     if (comp && !(comp.mime.startsWith('image/') || comp.mime === 'application/pdf')) {
@@ -138,6 +177,7 @@ export default async function rutasFinanzas(app: FastifyInstance) {
         [cid, d.unidadId, d.fechaPago, d.metodo, d.moneda, d.monto, d.referencia ?? null, d.bancoOrigen ?? null,
          d.cuentaDestinoId ?? null, d.nota ?? null, ruta]);
       if (comp && ruta) await guardarArchivo(ctx, c, 'comprobantes', ruta, comp);
+      if (d.cargoIds?.length) await c.query(`select fijar_destinos_pago($1, $2::uuid[])`, [rows[0].id, d.cargoIds]);
       return rows[0].id as string;
     });
     return rep.status(201).send({ id });
@@ -145,11 +185,12 @@ export default async function rutasFinanzas(app: FastifyInstance) {
 
   app.post('/c/:cid/pagos/:id/confirmar', async (req, rep) => {
     const p = ParamsC.extend({ id: Uuid }).parse(req.params);
-    const d = z.object({ cuentaDestinoId: Uuid.optional() }).parse(req.body ?? {});
+    // cargoIds (opcional): la junta cambia a qué deudas va el pago antes de aprobarlo.
+    const d = z.object({ cuentaDestinoId: Uuid.optional(), cargoIds: z.array(Uuid).max(60).optional() }).parse(req.body ?? {});
     await bd(req, async (c) => {
       const ok = await c.query(`select 1 from pagos where id = $1 and condominio_id = $2`, [p.id, p.cid]);
       if (!ok.rowCount) throw new ErrorApi(404, 'Pago no existe', 'no_encontrado');
-      await c.query(`select confirmar_pago($1, $2)`, [p.id, d.cuentaDestinoId ?? null]);
+      await c.query(`select confirmar_pago($1, $2, $3::uuid[])`, [p.id, d.cuentaDestinoId ?? null, d.cargoIds ?? null]);
     });
     return rep.status(204).send();
   });
@@ -211,6 +252,38 @@ export default async function rutasFinanzas(app: FastifyInstance) {
     const d = z.object({ periodo: Periodo }).parse(req.body);
     const r = await bd(req, (c) => c.query(`select generar_recibos($1, $2) as n`, [cid, d.periodo]));
     return { emitidos: num(r.rows[0].n) };
+  });
+
+  // ---------- Reporte y cierre del mes (v0.7) ----------
+  // El mes cerrado se entrega tal como se guardó; uno sin cerrar se calcula en vivo.
+  app.get('/c/:cid/reportes/mensual', async (req): Promise<ReporteDelMes> => {
+    const { cid } = ParamsC.parse(req.params);
+    const { periodo } = z.object({ periodo: Periodo }).parse(req.query);
+    return bd(req, async (c) => {
+      await exigirJunta(c, cid);
+      const k = (await c.query(`select k.*, pf.nombre from cierres_mensuales k left join perfiles pf on pf.id = k.cerrado_por
+                                 where k.condominio_id = $1 and k.periodo = $2`, [cid, periodo])).rows[0];
+      if (k) return { periodo, cerrado: { en: iso(k.cerrado_en)!, automatico: k.automatico, por: k.nombre ?? null }, datos: k.datos };
+      const r = (await c.query(`select reporte_mensual($1, $2) as d`, [cid, periodo])).rows[0];
+      return { periodo, cerrado: null, datos: r.d };
+    });
+  });
+
+  app.post('/c/:cid/reportes/mensual/cerrar', async (req) => {
+    const { cid } = ParamsC.parse(req.params);
+    const { periodo } = z.object({ periodo: Periodo }).parse(req.body);
+    const r = await bd(req, (c) => c.query(`select cerrar_mes($1, $2) as en`, [cid, periodo]));
+    return { cerradoEn: iso(r.rows[0].en) };
+  });
+
+  app.get('/c/:cid/cierres', async (req): Promise<CierreMes[]> => {
+    const { cid } = ParamsC.parse(req.params);
+    return bd(req, async (c) => {
+      await exigirJunta(c, cid);
+      return (await c.query(`select k.periodo, k.cerrado_en, k.automatico, pf.nombre from cierres_mensuales k
+                               left join perfiles pf on pf.id = k.cerrado_por where k.condominio_id = $1 order by k.periodo desc`, [cid]))
+        .rows.map((k) => ({ periodo: k.periodo, cerradoEn: iso(k.cerrado_en)!, automatico: k.automatico, por: k.nombre ?? null }));
+    });
   });
 
   // ---------- Conciliación bancaria ----------

@@ -3,7 +3,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { C, PNG, UNI, crearPrueba, formulario, type Prueba } from './_api.js';
-import { actualizarTasaBcv, extraerTasaBcv, facturarMes, purgarChat, suspenderMorosos } from '../src/tareas/index.js';
+import { actualizarTasaBcv, extraerDolarApi, extraerTasaBcv, facturarMes, purgarChat, suspenderMorosos } from '../src/tareas/index.js';
 import { crearPush } from '../src/push.js';
 
 let P: Prueba;
@@ -27,15 +27,64 @@ describe('tasa BCV', () => {
     assert.throws(() => extraerTasaBcv('<html>sin tasa</html>'), /cambió su formato/);
     assert.throws(() => extraerTasaBcv('<div id="dolar"><strong>0,00</strong></div>'), /inválida/);
   });
-  it('actualizarTasaBcv guarda la tasa con su fecha valor', async () => {
-    const falso = (async () => new Response(HTML_BCV, { status: 200 })) as typeof fetch;
-    const r = await actualizarTasaBcv(P.app.ctx, falso);
-    assert.equal(r.fecha, '2026-10-28');
-    const fila = (await P.base.admin.query(`select usd_ves, fuente from tasas_bcv where fecha = '2026-10-28'`)).rows[0];
-    assert.equal(Number(fila.usd_ves), 220.4567);
-    assert.equal(fila.fuente, 'BCV');
-    const caido = (async () => new Response('', { status: 503 })) as typeof fetch;
-    await assert.rejects(actualizarTasaBcv(P.app.ctx, caido), /503/);
+  it('lee DolarApi y rechaza respuestas que no son la tasa oficial', () => {
+    assert.deepEqual(extraerDolarApi({ fuente: 'oficial', promedio: 897.5383, fechaActualizacion: '2026-11-09T00:00:00-04:00' }),
+      { usdVes: 897.5383, fecha: '2026-11-09' });
+    assert.throws(() => extraerDolarApi({ fuente: 'paralelo', promedio: 900, fechaActualizacion: '2026-11-09T00:00:00-04:00' }), /oficial/);
+    assert.throws(() => extraerDolarApi({ fuente: 'oficial', promedio: 900 }), /fecha/);
+  });
+
+  it('dos fuentes que coinciden → verificada; si una falla o no coinciden, NO se acepta y no se puede pagar en Bs', async () => {
+    const hoy = (await P.base.admin.query(`select hoy_caracas()::text h`)).rows[0].h as string;
+    const htmlBcv = (v: string, f: string) => HTML_BCV.replace('220,45670000', v).replace('2026-10-28', f);
+    const fuentes = (bcv: Response | Error, dolar: Response | Error) => (async (url: string | URL) => {
+      const r = String(url).includes('bcv.org.ve') ? bcv : dolar;
+      if (r instanceof Error) throw r;
+      return r.clone();
+    }) as typeof fetch;
+    const dolarApi = (v: number, f: string) => new Response(JSON.stringify({ fuente: 'oficial', promedio: v, fechaActualizacion: `${f}T00:00:00-04:00` }), { status: 200 });
+    const vecino = await P.miembro('Vecino Tasa', 'propietario', 'a2');
+    const tasa = async (q = '') => (await P.pedir('GET', `tasa-bcv${q}`, vecino.acceso)).json;
+    await P.base.admin.query(`delete from lecturas_tasa`);
+
+    // 1) Solo responde DolarApi: una fuente, no hay tasa nueva.
+    let r = await actualizarTasaBcv(P.app.ctx, fuentes(new Error('fetch failed'), dolarApi(897.5383, hoy)));
+    assert.equal(r.estado, 'una_fuente');
+    assert.equal(r.lecturas.find((l) => l.fuente === 'BCV')!.ok, false);
+    assert.equal((await P.base.admin.query(`select count(*)::int n from tasas_bcv where fecha = $1`, [hoy])).rows[0].n, 0);
+
+    // 2) Las dos responden pero con valores distintos para la misma fecha: conflicto.
+    r = await actualizarTasaBcv(P.app.ctx, fuentes(new Response(htmlBcv('897,53830000', hoy)), dolarApi(901.1, hoy)));
+    assert.equal(r.estado, 'no_coinciden');
+    assert.equal((await tasa()).usdVes, 215.5, 'sigue la última verificada (semilla de prueba): nada nuevo entró');
+
+    // 3) Coinciden: verificada, con la fecha valor del BCV y su valor con 4 decimales.
+    r = await actualizarTasaBcv(P.app.ctx, fuentes(new Response(htmlBcv('897,53830000', hoy)), dolarApi(897.5383, hoy)));
+    assert.equal(r.estado, 'verificada');
+    assert.deepEqual(r.fuentes, ['BCV', 'DolarApi']);
+    const fila = (await P.base.admin.query(`select usd_ves, verificada, vigente_hasta::text v from tasas_bcv where fecha = $1`, [hoy])).rows[0];
+    assert.equal(Number(fila.usd_ves), 897.5383);
+    assert.equal(fila.verificada, true);
+    assert.equal(fila.v, hoy);
+    const t = (await tasa());
+    assert.equal(t.usdVes, 897.5383);
+    assert.equal(t.fecha, hoy);
+
+    // 4) Viernes en la tarde: el BCV publica la del próximo día hábil. Hoy sigue rigiendo la de hoy.
+    const manana = (await P.base.admin.query(`select (hoy_caracas() + 3)::text m`)).rows[0].m as string;
+    r = await actualizarTasaBcv(P.app.ctx, fuentes(new Response(htmlBcv('905,10000000', manana)), dolarApi(905.1, manana)));
+    assert.equal(r.estado, 'verificada');
+    assert.equal(r.fecha, manana);
+    assert.equal((await tasa()).usdVes, 897.5383, 'hoy rige la de hoy');
+    assert.equal((await tasa(`?fecha=${manana}`)).usdVes, 905.1, 'y desde su fecha valor, la nueva');
+    const despues = (await P.base.admin.query(`select (hoy_caracas() + 5)::text m`)).rows[0].m as string;
+    assert.equal((await tasa(`?fecha=${despues}`)).usdVes, null, 'más allá de lo comprobado no hay tasa');
+    assert.match((await tasa(`?fecha=${despues}`)).motivo, /tasa/i);
+
+    // 5) Las dos fuentes caídas: se registra el error y no cambia nada.
+    r = await actualizarTasaBcv(P.app.ctx, fuentes(new Response('', { status: 503 }), new Error('timeout')));
+    assert.equal(r.lecturas.every((l) => !l.ok), true);
+    assert.match(r.lecturas.find((l) => l.fuente === 'BCV')!.error!, /503/);
   });
 });
 

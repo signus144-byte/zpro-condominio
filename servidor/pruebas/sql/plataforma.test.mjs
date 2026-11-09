@@ -175,9 +175,12 @@ const met = await como(P.zp, `select * from metricas_plataforma()`);
 igual(Number(met[0].unidades), 8, `pero sí ve métricas agregadas (${met[0].unidades} unidades, ${met[0].unidades_con_app} con app, morosidad ${met[0].morosidad_pct} %)`);
 await debeFallar(P.pres, `select * from metricas_plataforma()`, 'la junta no ve métricas de otros condominios');
 
-console.log('\nTasa BCV desde la consola');
+console.log('\nTasa BCV: dos fuentes');
 await como(P.zp, `select plataforma_fijar_tasa_bcv(220.10)`);
-igual(Number((await admin(`select usd_ves from tasas_bcv where fecha = current_date`))[0].usd_ves), 220.1, 'ZentaPro carga la tasa BCV del día desde la consola');
+igual((await admin(`select count(*)::int n from tasas_bcv where fecha = hoy_caracas()`))[0].n, 0, 'la consola sola es UNA fuente: no fija la tasa');
+await debeFallar(P.pres, `insert into tasas_bcv (fecha, usd_ves) values (hoy_caracas(), 1)`, 'nadie escribe la tasa directamente');
+igual((await como(P.pres, `select * from confirmar_tasa_manual(220.10)`))[0].estado, 'verificada', 'la junta confirma el mismo valor: dos fuentes');
+igual(Number((await admin(`select usd_ves from tasas_bcv where fecha = hoy_caracas() and verificada`))[0].usd_ves), 220.1, 'queda la tasa verificada del día');
 
 console.log(fallas ? `\n${fallas} FALLAS` : '\nTodo OK');
 

@@ -53,7 +53,7 @@ describe('pagos de las casas', () => {
       assert.equal(n.tipo, 'pago_confirmado');
       assert.equal(n.titulo, 'Pago aprobado');
       assert.match(n.cuerpo, /aprobó su pago de Bs 21\.550,00 \(ref\. 00112233\)/);
-      assert.match(n.cuerpo, /Saldo pendiente: \$|Está al día/);
+      assert.match(n.cuerpo, /Saldo pendiente: \$|Está al día|a favor para el próximo recibo/);
       assert.equal(n.leida, false);
     }
     assert.ok(!(await bandeja(b34)).notificaciones.some((x) => x.datos.pagoId === pago1), 'otra casa no se entera');

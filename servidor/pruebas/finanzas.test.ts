@@ -2,6 +2,7 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { C, PNG, UNI, crearPrueba, formulario, type Prueba } from './_api.js';
+import { sqlComo } from './_entorno.js';
 
 let P: Prueba;
 let teso: { id: string; acceso: string }, pres: { id: string; acceso: string };
@@ -175,12 +176,27 @@ describe('mensualidad de ZentaPro', () => {
 });
 
 describe('tasa BCV manual', () => {
-  it('la presidenta carga y luego corrige la tasa del mismo día; un residente no puede', async () => {
+  it('la junta cuenta como UNA fuente: sola no basta; con DolarApi coincidiendo queda verificada; un residente no puede', async () => {
     const pres = await P.miembro('Pres Tasa', 'presidente');
+    const teso = await P.miembro('Teso Tasa', 'tesorero');
     const res = await P.miembro('Res Tasa', 'propietario', 'a2');
-    assert.equal((await P.pedir('POST', `c/${C}/tasa-bcv`, pres.acceso, { usdVes: 230.5 })).status, 204);
-    assert.equal((await P.pedir('POST', `c/${C}/tasa-bcv`, pres.acceso, { usdVes: 231.25 })).status, 204, 'corregir la del mismo día');
-    assert.equal((await P.pedir('GET', 'tasa-bcv', res.acceso)).json.usdVes, 231.25);
+    let r = await P.pedir('POST', `c/${C}/tasa-bcv`, pres.acceso, { usdVes: 230.5 });
+    assert.equal(r.status, 200, r.body);
+    assert.equal(r.json.resultado, 'una_fuente');
+    // Otra persona de la junta con el mismo número NO es una segunda fuente.
+    r = await P.pedir('POST', `c/${C}/tasa-bcv`, teso.acceso, { usdVes: 230.5 });
+    assert.equal(r.json.resultado, 'una_fuente', 'dos personas de la junta = una sola fuente');
+    assert.equal((await P.pedir('POST', `c/${C}/tasa-bcv`, pres.acceso, { usdVes: 231.25 })).json.resultado, 'una_fuente', 'corrige su número');
+    // DolarApi dice lo mismo (1 céntimo de diferencia por redondeo): dos fuentes → verificada.
+    await sqlComo(P.base.api, 'servicio', `select registrar_lectura_tasa('DolarApi', hoy_caracas(), 231.2534)`);
+    const v = (await sqlComo(P.base.api, 'servicio', `select * from consolidar_tasa()`))[0];
+    assert.equal(v.estado, 'verificada');
+    const t = (await P.pedir('GET', 'tasa-bcv', res.acceso)).json;
+    assert.equal(t.usdVes, 231.2534, 'se guarda el valor con más decimales de la fuente automática');
+    assert.equal(t.verificada, true);
+    assert.deepEqual(t.fuentes, ['DolarApi', 'Junta']);
     assert.equal((await P.pedir('POST', `c/${C}/tasa-bcv`, res.acceso, { usdVes: 1 })).status, 403);
+    const lect = (await P.pedir('GET', `c/${C}/tasa-bcv/lecturas`, pres.acceso)).json as { fuente: string }[];
+    assert.deepEqual(lect.map((l) => l.fuente).sort(), ['DolarApi', 'Junta']);
   });
 });

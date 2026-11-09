@@ -19,7 +19,11 @@ insert into cuentas_financieras (condominio_id, nombre, tipo, moneda, datos_pago
   ('00000000-0000-0000-0000-0000000000c1', 'Caja en divisas', 'caja', 'USD', 'Entregar al tesorero con recibo'),
   ('00000000-0000-0000-0000-0000000000c1', 'Fondo de reserva', 'fondo_reserva', 'USD', null);
 
-insert into tasas_bcv (fecha, usd_ves) values ('2026-10-01', 200.0000), ('2026-10-27', 215.5000);
+-- Tasas FICTICIAS de demostración (verificadas a mano para que los datos de ejemplo funcionen). En producción
+-- no existe esta semilla: las tasas solo entran verificadas por dos fuentes (ver 0022_tasa_verificada.sql).
+insert into tasas_bcv (fecha, usd_ves, fuente, verificada, fuentes, verificada_en, vigente_hasta) values
+  ('2026-10-01', 200.0000, 'semilla demo', true, '{semilla}', now(), '2026-10-26'),
+  ('2026-10-27', 215.5000, 'semilla demo', true, '{semilla}', now(), '2099-12-31');
 
 insert into gastos (condominio_id, periodo, tipo, categoria, descripcion, moneda, monto, tasa_bcv) values
   ('00000000-0000-0000-0000-0000000000c1', '2026-10-01', 'comun', 'Vigilancia', 'Servicio de vigilancia octubre', 'USD', 600, null),

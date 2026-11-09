@@ -5,10 +5,11 @@
 //   · Validar el cuerpo con zod; responder en camelCase con los tipos de /compartido/tipos.ts
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { Aviso, Condominio, CuentaFinanciera, Marca } from '../../../compartido/tipos.js';
+import type { Aviso, Condominio, CuentaFinanciera, LecturaTasa, Marca, TasaBcv } from '../../../compartido/tipos.js';
 import { bd, una } from '../contexto.js';
 import { guardarArchivo, leerFormulario, urlFirmada } from '../archivos/archivos.js';
 import { ErrorApi } from '../util/errores.js';
+import { exigirFinanzas, exigirJunta, iso, num } from './_comun.js';
 
 export const ParamsC = z.object({ cid: z.guid() });
 export const Uuid = z.guid();
@@ -77,18 +78,36 @@ export default async function rutasCondominio(app: FastifyInstance) {
     return filas.map((c) => ({ id: c.id, nombre: c.nombre, tipo: c.tipo, moneda: c.moneda, datosPago: c.datos_pago }));
   });
 
-  app.get('/tasa-bcv', async (req) => {
-    const t = await bd(req, async (c) => (await c.query(`select fecha, usd_ves from tasas_bcv order by fecha desc limit 1`)).rows[0]);
-    return t ? { fecha: t.fecha, usdVes: t.usd_ves } : null;
+  // Tasa BCV que rige un día (por defecto hoy, hora de Caracas). Solo se entrega si DOS fuentes coinciden
+  // (0022_tasa_verificada.sql); si no, usdVes = null y "motivo" dice por qué. La app no deja pagar en Bs sin ella.
+  app.get('/tasa-bcv', async (req): Promise<TasaBcv> => {
+    const { fecha } = z.object({ fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).parse(req.query);
+    const t = await bd(req, async (c) => (await c.query(`select * from estado_tasa($1::date)`, [fecha ?? null])).rows[0]);
+    return mapTasa(t);
   });
 
-  // Carga manual de la tasa (junta con permiso de finanzas). La tarea automática la toma del BCV.
-  app.post('/c/:cid/tasa-bcv', async (req, rep) => {
-    ParamsC.parse(req.params);
+  // La junta (finanzas) confirma la tasa como una fuente más: con otra fuente que coincida, queda verificada.
+  app.post('/c/:cid/tasa-bcv', async (req) => {
+    const { cid } = ParamsC.parse(req.params);
     const d = z.object({ usdVes: z.number().positive().max(1e7), fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).parse(req.body);
-    await bd(req, (c) => c.query(`insert into tasas_bcv (fecha, usd_ves, fuente) values (coalesce($1::date, current_date), $2, 'manual junta')
-                                  on conflict (fecha) do update set usd_ves = excluded.usd_ves, fuente = excluded.fuente`, [d.fecha ?? null, d.usdVes]));
-    return rep.status(204).send();
+    return bd(req, async (c) => {
+      await exigirFinanzas(c, cid);
+      const r = (await c.query(`select * from confirmar_tasa_manual($1, $2::date)`, [d.usdVes, d.fecha ?? null])).rows[0];
+      const t = (await c.query(`select * from estado_tasa($1::date)`, [d.fecha ?? null])).rows[0];
+      return { resultado: r.estado as 'verificada' | 'una_fuente' | 'no_coinciden' | 'sin_datos', tasa: mapTasa(t) };
+    });
+  });
+
+  // Lo que dijo cada fuente en las últimas 24 horas (para que la junta vea de dónde sale el número).
+  app.get('/c/:cid/tasa-bcv/lecturas', async (req): Promise<LecturaTasa[]> => {
+    const { cid } = ParamsC.parse(req.params);
+    return bd(req, async (c) => {
+      await exigirJunta(c, cid);
+      return (await c.query(`select * from lecturas_tasa_recientes() order by leida_en desc`)).rows.map((l) => ({
+        fuente: l.fuente, automatica: l.automatica, fechaValor: l.fecha_valor, usdVes: l.usd_ves == null ? null : num(l.usd_ves),
+        error: l.error, leidaEn: iso(l.leida_en)!,
+      }));
+    });
   });
 
   app.get('/c/:cid/avisos', async (req): Promise<Aviso[]> => {
@@ -112,4 +131,12 @@ export default async function rutasCondominio(app: FastifyInstance) {
     if (!r.rowCount) throw new ErrorApi(403, 'Sin permiso', 'sin_permiso');
     return rep.status(204).send();
   });
+}
+
+export function mapTasa(t: Record<string, any>): TasaBcv {
+  return {
+    hoy: t.hoy, fecha: t.fecha, usdVes: t.usd_ves == null ? null : num(t.usd_ves), verificada: Boolean(t.verificada),
+    fuentes: (t.fuentes ?? []).map((f: string) => f.startsWith('junta:') ? 'Junta' : f.startsWith('consola:') ? 'Technical Digital TD' : f),
+    verificadaEn: iso(t.verificada_en), ultimaConsulta: iso(t.ultima_consulta), motivo: t.motivo ?? null,
+  };
 }

@@ -16,3 +16,13 @@ export async function recordarPagosPendientes(ctx: Contexto) {
 export async function vencerAlertas(ctx: Contexto, horas = 3) {
   return comoServicio(ctx.pool, async (c) => Number((await c.query(`select vencer_alertas($1) as n`, [horas])).rows[0].n));
 }
+
+/** A las 9:05: si la tasa BCV de hoy no tiene dos fuentes, avisa a la junta de cada condominio (una vez al día). */
+export async function avisarTasaSinVerificar(ctx: Contexto) {
+  return comoServicio(ctx.pool, async (c) => Number((await c.query(`select avisar_tasa_sin_verificar() as n`)).rows[0].n));
+}
+
+/** Día 1: guarda el cierre del mes anterior de cada condominio (historial) y avisa a la junta. */
+export async function cierreAutomatico(ctx: Contexto) {
+  return comoServicio(ctx.pool, async (c) => (await c.query(`select * from cierre_automatico()`)).rows.length);
+}

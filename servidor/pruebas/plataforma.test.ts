@@ -204,7 +204,8 @@ describe('facturación, cobro y suspensión', () => {
     assert.equal(fac.estado, 'emitida');
     assert.equal(fac.abonadoUsd, 20);
     // Segundo abono otro día con otra tasa: lo que cuenta es el equivalente en dólares.
-    await P.base.admin.query(`insert into tasas_bcv (fecha, usd_ves, fuente) values (current_date - 1, $1, 'manual') on conflict (fecha) do nothing`, [tasa - 10]);
+    await P.base.admin.query(`insert into tasas_bcv (fecha, usd_ves, fuente, verificada, fuentes, vigente_hasta)
+        values (current_date - 1, $1, 'prueba', true, '{prueba}', '2099-12-31') on conflict (fecha) do nothing`, [tasa - 10]);
     const ayer = Number((await P.base.admin.query(`select usd_ves from tasas_bcv where fecha <= current_date - 1 order by fecha desc limit 1`)).rows[0].usd_ves);
     await sqlComo(P.base.api, pres, `insert into pagos_plataforma (factura_id, condominio_id, metodo, moneda, monto, referencia, reportado_por, fecha_pago)
         values ($1, $2, 'transferencia', 'VES', $3, 'AB2', auth.uid(), current_date - 1)`, [f, nuevoId, Math.round(20 * ayer * 100) / 100]);
@@ -247,8 +248,15 @@ describe('facturación, cobro y suspensión', () => {
 
   it('estado; tasa BCV desde la consola', async () => {
     assert.equal((await P.pedir('POST', `plataforma/condominios/${nuevoId}/estado`, dueno.acceso, { estado: 'feliz' })).status, 400);
+    // Technical Digital TD confirma la tasa: es UNA fuente; con la junta coincidiendo, son dos y queda verificada.
+    const antes = (await P.pedir('GET', 'tasa-bcv', finanzas.acceso)).json.usdVes;
     assert.equal((await P.pedir('POST', 'plataforma/tasa-bcv', finanzas.acceso, { usdVes: 230.75 })).status, 204);
-    assert.equal((await P.pedir('GET', 'tasa-bcv', finanzas.acceso)).json.usdVes, 230.75);
+    assert.equal((await P.pedir('GET', 'tasa-bcv', finanzas.acceso)).json.usdVes, antes, 'una sola fuente no cambia la tasa');
+    const pres = (await P.base.admin.query(`select usuario_id from membresias where condominio_id = $1 and rol = 'presidente'`, [nuevoId])).rows[0].usuario_id;
+    assert.equal((await sqlComo(P.base.api, pres, `select * from confirmar_tasa_manual(230.75)`))[0].estado, 'verificada');
+    const t = (await P.pedir('GET', 'tasa-bcv', finanzas.acceso)).json;
+    assert.equal(t.usdVes, 230.75);
+    assert.deepEqual(t.fuentes, ['Junta', 'Technical Digital TD']);
     assert.equal((await P.pedir('GET', 'plataforma/planes', soporte.acceso)).json.length, 4);
   });
 });

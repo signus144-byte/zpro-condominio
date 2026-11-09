@@ -2,7 +2,7 @@
 // ponderado por alícuota (o 1 por unidad); el umbral se mide sobre el total del condominio.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { FilaActa, Partida, Votacion } from '../../../compartido/tipos.js';
+import type { CobroPartidaCasa, FilaActa, Partida, Votacion } from '../../../compartido/tipos.js';
 import { AlcanceCasasZ, resolverAlcance, textoMonto } from './difusion.js';
 import { bd } from '../contexto.js';
 import type { Tx } from '../db/conexion.js';
@@ -28,6 +28,10 @@ export default async function rutasPartidas(app: FastifyInstance) {
       const partidas = (await c.query(`select * from partidas_especiales where condominio_id = $1 order by creado_en desc`, [cid])).rows;
       const mias = await misUnidades(c, cid);
       const junta = (await c.query(`select es_junta($1) as j`, [cid])).rows[0].j as boolean;
+      const avances = new Map((await c.query(`select * from avance_partidas($1)`, [cid])).rows.map((a) => [a.partida_id as string, {
+        emitidoUsd: num(a.emitido_usd), cobradoUsd: num(a.cobrado_usd), pendienteUsd: num(a.pendiente_usd),
+        casas: num(a.casas), casasAlDia: num(a.casas_al_dia), cuotasEmitidas: num(a.cuotas_emitidas),
+      }]));
       const salida: Partida[] = [];
       for (const p of partidas) {
         const incluidas = (await c.query(`select u.id, u.alicuota from unidades u where u.id in (select unidades_partida($1))`, [p.id])).rows;
@@ -57,6 +61,7 @@ export default async function rutasPartidas(app: FastifyInstance) {
                                                          : r2(presupuesto / p.numero_cuotas / nUnidades)) : null,
           alcance: { tipo: p.alcance, nombre: p.alcance_nombre ?? null, unidades: incluidas.length },
           meAfecta: Boolean(yo),
+          avance: avances.get(p.id) ?? null,
           ...(junta ? { unidadIds: [...ids] } : {}),
         });
       }
@@ -108,6 +113,19 @@ export default async function rutasPartidas(app: FastifyInstance) {
       return { id: p, difusion };
     });
     return rep.status(201).send(r);
+  });
+
+  // Quién pagó y quién no esta cuota especial (solo la junta).
+  app.get('/c/:cid/partidas/:pid/cobro', async (req): Promise<CobroPartidaCasa[]> => {
+    const p = ParamsC.extend({ pid: Uuid }).parse(req.params);
+    return bd(req, async (c) => {
+      const ok = await c.query(`select 1 from partidas_especiales where id = $1 and condominio_id = $2`, [p.pid, p.cid]);
+      if (!ok.rowCount) throw new ErrorApi(404, 'Cuota especial no existe', 'no_encontrado');
+      return (await c.query(`select * from cobro_partida($1)`, [p.pid])).rows.map((r) => ({
+        unidadId: r.unidad_id, etiqueta: r.etiqueta, propietario: r.propietario,
+        cargadoUsd: num(r.cargado_usd), pagadoUsd: num(r.pagado_usd), pendienteUsd: num(r.pendiente_usd),
+      }));
+    });
   });
 
   app.post('/c/:cid/votaciones/:vid/votar', async (req, rep) => {

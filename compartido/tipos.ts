@@ -40,18 +40,31 @@ export interface CuentaFinanciera {
   moneda: Moneda; datosPago: string | null;
 }
 
-export interface Cargo { id: string; unidadId: string; periodo: string; tipo: TipoCargo; concepto: string; montoUsd: number }
+export type EstadoCargo = 'pagado' | 'parcial' | 'pendiente' | 'credito';
+export interface Cargo {
+  id: string; unidadId: string; periodo: string; tipo: TipoCargo; concepto: string; montoUsd: number;
+  /** v0.7: cuánto de este cargo ya se descontó con pagos aprobados, cuánto falta y su estado. */
+  pagadoUsd?: number; pendienteUsd?: number; estado?: EstadoCargo; partidaId?: string | null;
+}
+/** A qué deuda va (o fue) un pago. */
+export interface AplicacionPago { cargoId: string; concepto: string; periodo: string; montoUsd: number }
 
 export interface Pago {
   id: string; unidadId: string; unidadEtiqueta: string; fechaPago: string; metodo: MetodoPago; moneda: Moneda;
   monto: number; tasaBcv: number | null; montoUsd: number; referencia: string | null;
   bancoOrigen: string | null; comprobanteUrl: string | null; nota: string | null;
   estado: EstadoPago; motivoRechazo: string | null; creadoEn: string;
+  /** v0.7: lo que el vecino (o la junta al aprobar) eligió pagar; montoUsd = lo pendiente de esa deuda. */
+  destinos?: AplicacionPago[];
+  /** v0.7: cómo quedó descontado al aprobarse (lo elegido primero; lo que sobra, a la deuda más antigua). */
+  aplicaciones?: AplicacionPago[];
 }
 
 export interface NuevoPago {
   unidadId: string; fechaPago: string; metodo: MetodoPago; moneda: Moneda; monto: number;
   referencia?: string; bancoOrigen?: string; cuentaDestinoId?: string; nota?: string; comprobante?: Blob | null;
+  /** v0.7: deudas que cubre este pago (en el orden elegido). */
+  cargoIds?: string[];
 }
 
 export interface EstadoCuenta { unidad: Unidad; cargos: Cargo[]; pagos: Pago[]; saldoUsd: number }
@@ -83,7 +96,14 @@ export interface Partida {
   alcance: { tipo: 'todos' | 'unidades'; nombre: string | null; unidades: number };
   meAfecta: boolean;                // alguna de mis casas está incluida
   unidadIds?: string[];             // solo para la junta: las casas incluidas
+  /** v0.7: cuánto se ha emitido y cobrado de esta cuota especial. */
+  avance?: AvancePartida | null;
 }
+export interface AvancePartida {
+  emitidoUsd: number; cobradoUsd: number; pendienteUsd: number; casas: number; casasAlDia: number; cuotasEmitidas: number;
+}
+/** Detalle por casa del cobro de una cuota especial (solo la junta). */
+export interface CobroPartidaCasa { unidadId: string; etiqueta: string; propietario: string | null; cargadoUsd: number; pagadoUsd: number; pendienteUsd: number }
 /** A quién se dirige algo (cuota especial o mensaje masivo). */
 export type AlcanceCasas =
   | { tipo: 'todos' }
@@ -316,3 +336,56 @@ export interface NuevaCuenta { nombre: string; correo: string; clave: string; te
 export interface MovimientoExtracto { fecha: string; referencia: string; descripcion: string; monto: number }
 /** Pago de la mensualidad de ZentaPro: SOLO en bolívares (Pago Móvil o transferencia). */
 export interface NuevoPagoZentaPro { metodo: 'pago_movil' | 'transferencia'; montoVes: number; referencia: string; fechaPago?: string }
+
+// ---------------- v0.7: tasa BCV verificada y cierre mensual ----------------
+
+/** Tasa BCV que rige un día. usdVes = null si no está confirmada por dos fuentes: NO se puede pagar en Bs. */
+export interface TasaBcv {
+  hoy: string;                      // fecha de hoy en Caracas (AAAA-MM-DD)
+  fecha: string | null;             // fecha valor de la tasa
+  usdVes: number | null;
+  verificada: boolean;
+  fuentes: string[];                // p. ej. ['BCV', 'DolarApi'] o ['DolarApi', 'Junta']
+  verificadaEn: string | null;
+  ultimaConsulta: string | null;    // última consulta automática del servidor
+  motivo: string | null;            // por qué no hay tasa (para mostrarlo tal cual)
+}
+export interface LecturaTasa { fuente: string; automatica: boolean; fechaValor: string | null; usdVes: number | null; error: string | null; leidaEn: string }
+export interface ResultadoConfirmarTasa { resultado: 'verificada' | 'una_fuente' | 'no_coinciden' | 'sin_datos'; tasa: TasaBcv }
+
+export interface CasaReporteMensual {
+  unidadId: string; etiqueta: string; propietario: string | null; alicuota: number;
+  saldoAnteriorUsd: number; facturadoUsd: number; pagadoUsd: number; saldoFinalUsd: number;
+  estado: 'al_dia' | 'debe' | 'a_favor';
+  recibo: 'pagado' | 'parcial' | 'pendiente' | 'sin_recibo';
+  pagosRechazados: number; pagosEnRevision: number;
+}
+export interface PagoReporteMensual {
+  id: string; unidad: string; fechaPago: string; metodo: MetodoPago; moneda: Moneda; monto: number; tasaBcv: number | null;
+  montoUsd: number; referencia: string | null; estado: EstadoPago; motivoRechazo: string | null; revisadoEn: string | null;
+  aplicadoA: { concepto: string; periodo: string; montoUsd: number }[];
+}
+export interface ReporteMensual {
+  periodo: string; desde: string; hasta: string; generadoEn: string; tasaBcv: number | null; tasaFecha: string | null;
+  resumen: {
+    facturadoUsd: number; facturadoPorTipo: Partial<Record<TipoCargo, number>>;
+    cobradoUsd: number; cobradoBs: number; cobradoDivisasUsd: number; gastosUsd: number;
+    deudaInicialUsd: number; deudaFinalUsd: number; aFavorUsd: number;
+    totalCasas: number; casasAlDia: number; casasConDeuda: number;
+    pagosAprobados: number; pagosRechazados: number; pagosEnRevision: number; enRevisionUsd: number;
+  };
+  casas: CasaReporteMensual[];
+  pagos: PagoReporteMensual[];
+  gastos: { fecha: string; categoria: string; descripcion: string; tipo: 'comun' | 'no_comun' | 'partida'; moneda: Moneda; monto: number;
+            tasaBcv: number | null; montoUsd: number; cuenta: string | null; proveedor: string | null }[];
+  cuentas: { nombre: string; moneda: Moneda; tipo: string; saldoInicial: number; entradas: number; salidas: number; saldoFinal: number }[];
+  fondoReserva: { facturadoAcumUsd: number; cobradoAcumUsd: number };
+  partidas: { id: string; titulo: string; presupuestoUsd: number; estado: EstadoPartida; emitidoUsd: number; cobradoUsd: number; casas: number }[];
+}
+/** Reporte de un mes: el guardado al cerrarlo (cerrado != null) o el calculado en vivo si aún no se cierra. */
+export interface ReporteDelMes {
+  periodo: string;
+  cerrado: { en: string; automatico: boolean; por: string | null } | null;
+  datos: ReporteMensual;
+}
+export interface CierreMes { periodo: string; cerradoEn: string; automatico: boolean; por: string | null }
