@@ -8,6 +8,7 @@ import type {
   AlertaVecinal, CercaniaUnidad, ConfigAlerta, EnlaceInvitacion, EstadoAlerta, InfoInvitacion, NuevaAlerta,
   ParticipanteAlerta, RespuestaAlerta,
   AlcanceDifusion, Difusion, GrupoUnidades, NuevaDifusion, NuevoGrupo, PreviaDifusion, UnidadAlcance,
+  CierreMes, CobroPartidaCasa, LecturaTasa, ReporteDelMes, ResultadoConfirmarTasa, TasaBcv,
 } from './tipos';
 
 /** Resultado de un mensaje masivo. */
@@ -57,8 +58,12 @@ export interface Api {
   condominio(): Promise<Condominio>;
   cuentasDePago(): Promise<CuentaFinanciera[]>;             // las que tienen datos para pagar
   cuentasFinancieras(): Promise<CuentaFinanciera[]>;        // todas las activas (conciliación)
-  tasaBcv(): Promise<{ fecha: string; usdVes: number } | null>;
-  fijarTasaBcv(usdVes: number): Promise<void>;              // junta con finanzas
+  /** Tasa BCV que rige ese día (por defecto hoy). usdVes = null si no está confirmada por dos fuentes (ver motivo).
+   *  Lanza error de red si no hay conexión: la app NUNCA usa una tasa guardada de otro día para cobrar. */
+  tasaBcv(fecha?: string): Promise<TasaBcv>;
+  /** La junta (finanzas) confirma la tasa como una fuente más. */
+  fijarTasaBcv(usdVes: number, fecha?: string): Promise<ResultadoConfirmarTasa>;
+  lecturasTasa(): Promise<LecturaTasa[]>;                   // junta: qué dijo cada fuente
   avisos(): Promise<Aviso[]>;
   crearAviso(a: { titulo: string; cuerpo: string; fijado: boolean }): Promise<void>;
   borrarAviso(id: string): Promise<void>;
@@ -71,13 +76,19 @@ export interface Api {
 
   // ---------------- Presidencia · finanzas ----------------
   panel(): Promise<ResumenPanel>;
-  pagos(filtro: 'reportado' | 'todos'): Promise<Pago[]>;
-  confirmarPago(id: string): Promise<void>;
+  pagos(filtro: 'reportado' | 'todos', mes?: string): Promise<Pago[]>;
+  /** cargoIds: la junta cambia a qué deudas va el pago antes de aprobarlo (si no, va a lo que eligió el vecino). */
+  confirmarPago(id: string, cargoIds?: string[]): Promise<void>;
   rechazarPago(id: string, motivo: string): Promise<void>;
   gastos(periodo: string): Promise<Gasto[]>;
   registrarGasto(g: NuevoGasto): Promise<void>;
   generarRecibos(periodo: string): Promise<number>;
   unidadesConSaldo(): Promise<UnidadConSaldo[]>;
+
+  // Reporte y cierre del mes (v0.7)
+  reporteMensual(periodo: string): Promise<ReporteDelMes>;
+  cerrarMes(periodo: string): Promise<void>;
+  cierres(): Promise<CierreMes[]>;
 
   // Conciliación bancaria (v0.3)
   movimientosBancarios(soloPendientes: boolean): Promise<MovimientoBancario[]>;
@@ -99,6 +110,8 @@ export interface Api {
 
   // ---------------- Partidas especiales y votaciones ----------------
   partidas(): Promise<Partida[]>;
+  /** Junta: quién pagó y quién no una cuota especial. */
+  cobroPartida(partidaId: string): Promise<CobroPartidaCasa[]>;
   /** Crea la cuota especial; si se pidió, avisa de una vez a las casas incluidas (difusion != null). */
   crearPartida(p: NuevaPartida): Promise<{ id: string; difusion: DifusionEnviada | null }>;
   votar(votacionId: string, opcionId: string): Promise<void>;

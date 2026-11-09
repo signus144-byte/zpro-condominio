@@ -1,6 +1,7 @@
 // Plantillas PDF con la marca del condominio.
-import type { Cargo, CuentaFinanciera, EstadoCuenta, FilaActa, Gasto, Partida, Unidad } from '../data/tipos';
+import type { Cargo, CuentaFinanciera, EstadoCuenta, FilaActa, Gasto, Partida, ReporteDelMes, Unidad } from '../data/tipos';
 import {
+  libroDelMes,
   ESTADO_PAGO, METODOS, TIPO_CARGO, URL_VERIFICAR, bs, etiquetaUnidad, fechaCorta, fechaLarga, mesLargo, pct, r2, usd,
   type MarcaDoc, type OpcionesDoc,
 } from './comun';
@@ -202,5 +203,82 @@ export async function actaVotacionPdf(marca: MarcaDoc, p: Partida, filas: FilaAc
   l.parrafo('Nota: la validez de esta votación como consulta por escrito depende de lo establecido en el documento de condominio y en la Ley de Propiedad Horizontal. ' +
     'El registro electrónico de cada voto (fecha, hora y usuario) se conserva en el sistema y puede verificarse con el código de este documento.', { tam: 7.5, color: 'gris' });
   l.firmas(o.firmantes ?? ['Presidente(a)', 'Secretario(a) / Tesorero(a)', 'Testigo'], true);
+  return l.terminar();
+}
+
+
+// ---------------- Reporte del mes (cierre) ----------------
+const ESTADO_CASA: Record<string, string> = { al_dia: 'Al día', debe: 'Debe', a_favor: 'A favor' };
+const RECIBO: Record<string, string> = { pagado: 'pagado', parcial: 'abonado', pendiente: 'pendiente', sin_recibo: 'sin recibo' };
+const monto2 = (m: number, moneda: string) => (moneda === 'USD' ? usd(m) : bs(m));
+
+export async function reporteMensualPdf(marca: MarcaDoc, rep: ReporteDelMes, o: OpcionesDoc = {}): Promise<Uint8Array> {
+  const d = rep.datos, r = d.resumen;
+  const estado = rep.cerrado
+    ? `Cerrado el ${fechaCorta(rep.cerrado.en)}${rep.cerrado.automatico ? ' (cierre automático)' : rep.cerrado.por ? ` por ${rep.cerrado.por}` : ''}`
+    : `Provisional al ${fechaCorta(d.generadoEn)} (mes sin cerrar)`;
+  const l = await Lienzo.crear(marca, { titulo: `Reporte del mes · ${mesLargo(d.periodo)}`, subtitulo: estado, codigo: o.codigo, fecha: o.fecha });
+  l.cifras([
+    { etiqueta: 'Facturado del mes', valor: usd(r.facturadoUsd) },
+    { etiqueta: 'Cobrado (pagos aprobados)', valor: usd(r.cobradoUsd), nota: r.facturadoUsd ? `${Math.round(100 * r.cobradoUsd / r.facturadoUsd)} % de lo facturado` : undefined },
+    { etiqueta: 'Gastos del mes', valor: usd(r.gastosUsd) },
+  ]);
+  l.cifras([
+    { etiqueta: 'Deuda al cierre', valor: usd(r.deudaFinalUsd), nota: `${r.casasConDeuda} de ${r.totalCasas} casas con deuda`, destacar: true },
+    { etiqueta: 'Casas al día', valor: `${r.casasAlDia} de ${r.totalCasas}` },
+    { etiqueta: 'Pagos del mes', valor: `${r.pagosAprobados} aprobados`, nota: `${r.pagosRechazados} rechazados · ${r.pagosEnRevision} en revisión` },
+  ]);
+  if (d.tasaBcv) l.parrafo(`Tasa BCV de referencia: ${d.tasaBcv.toLocaleString('es-VE', { maximumFractionDigits: 4 })} Bs/$${d.tasaFecha ? ` (fecha valor ${fechaCorta(d.tasaFecha)})` : ''}. Cada pago en bolívares se convirtió con la tasa del día en que se hizo.`, { color: 'gris', tam: 8 });
+
+  l.seccion('Quién pagó y quién no');
+  l.tabla([
+    { titulo: 'Casa', ancho: 0.12 }, { titulo: 'Propietario', ancho: 0.2 }, { titulo: 'Saldo anterior', ancho: 0.13, alinear: 'der' },
+    { titulo: 'Facturado', ancho: 0.12, alinear: 'der' }, { titulo: 'Pagado', ancho: 0.12, alinear: 'der' },
+    { titulo: 'Saldo al cierre', ancho: 0.14, alinear: 'der' }, { titulo: 'Estado', ancho: 0.17 },
+  ], d.casas.map((c) => ({
+    celdas: [c.etiqueta.replace(/^Apto /, ''), c.propietario ?? '', usd(c.saldoAnteriorUsd), usd(c.facturadoUsd), usd(c.pagadoUsd), usd(c.saldoFinalUsd),
+             `${ESTADO_CASA[c.estado]}${c.recibo !== 'sin_recibo' ? ` · recibo ${RECIBO[c.recibo]}${c.recibo === 'pagado' && c.estado === 'debe' ? ' después del cierre' : ''}` : ''}`],
+    negrita: c.estado === 'debe',
+  })));
+
+  l.seccion('Pagos del mes');
+  if (d.pagos.length) l.tabla([
+    { titulo: 'Fecha', ancho: 0.11 }, { titulo: 'Casa', ancho: 0.1 }, { titulo: 'Método · ref.', ancho: 0.17 }, { titulo: 'Monto', ancho: 0.14, alinear: 'der' },
+    { titulo: 'En $', ancho: 0.1, alinear: 'der' }, { titulo: 'Estado', ancho: 0.12 }, { titulo: 'Se descontó de / motivo', ancho: 0.26 },
+  ], d.pagos.map((p) => ({
+    celdas: [fechaCorta(p.fechaPago), p.unidad, `${METODOS[p.metodo] ?? p.metodo}${p.referencia ? ` · ${p.referencia}` : ''}`, monto2(p.monto, p.moneda), usd(p.montoUsd),
+             ESTADO_PAGO[p.estado] ?? p.estado,
+             p.estado === 'rechazado' ? `Rechazado: ${p.motivoRechazo ?? ''}` : p.aplicadoA.map((a) => `${a.concepto} ${usd(a.montoUsd)}`).join('; ')],
+  })));
+  else l.parrafo('No hubo pagos con fecha en este mes.', { color: 'gris' });
+
+  l.seccion('Libro de ingresos y egresos');
+  const libro = libroDelMes(d);
+  if (libro.length) {
+    l.tabla([
+      { titulo: 'Fecha', ancho: 0.11 }, { titulo: 'Concepto', ancho: 0.37 }, { titulo: 'Ingreso $', ancho: 0.14, alinear: 'der' },
+      { titulo: 'Egreso $', ancho: 0.14, alinear: 'der' }, { titulo: 'Acumulado $', ancho: 0.24, alinear: 'der' },
+    ], [
+      ...libro.map((f) => ({ celdas: [fechaCorta(f.fecha), `${f.concepto} · ${f.detalle}`, f.ingresoUsd ? usd(f.ingresoUsd) : '', f.egresoUsd ? usd(f.egresoUsd) : '', usd(f.acumuladoUsd)] })),
+      { celdas: ['', 'Resultado del mes', usd(r.cobradoUsd), usd(r.gastosUsd), usd(r2(r.cobradoUsd - r.gastosUsd))], negrita: true, fondo: 'marca' as const },
+    ]);
+  } else l.parrafo('Sin movimientos.', { color: 'gris' });
+
+  l.seccion('Saldos de las cuentas');
+  l.tabla([
+    { titulo: 'Cuenta', ancho: 0.32 }, { titulo: 'Saldo inicial', ancho: 0.17, alinear: 'der' }, { titulo: 'Entradas', ancho: 0.17, alinear: 'der' },
+    { titulo: 'Salidas', ancho: 0.17, alinear: 'der' }, { titulo: 'Saldo final', ancho: 0.17, alinear: 'der' },
+  ], d.cuentas.map((c) => ({ celdas: [c.nombre, monto2(c.saldoInicial, c.moneda), monto2(c.entradas, c.moneda), monto2(c.salidas, c.moneda), monto2(c.saldoFinal, c.moneda)] })));
+  l.parrafo(`Fondo de reserva: facturado acumulado ${usd(d.fondoReserva.facturadoAcumUsd)} · cobrado acumulado ${usd(d.fondoReserva.cobradoAcumUsd)}.`, { tam: 9 });
+
+  if (d.partidas.length) {
+    l.seccion('Cuotas especiales');
+    l.tabla([
+      { titulo: 'Cuota especial', ancho: 0.4 }, { titulo: 'Presupuesto', ancho: 0.15, alinear: 'der' }, { titulo: 'Emitido', ancho: 0.15, alinear: 'der' },
+      { titulo: 'Cobrado', ancho: 0.15, alinear: 'der' }, { titulo: '% cobrado', ancho: 0.15, alinear: 'der' },
+    ], d.partidas.map((p) => ({ celdas: [`${p.titulo} (${p.casas} casas)`, usd(p.presupuestoUsd), usd(p.emitidoUsd), usd(p.cobradoUsd),
+                                         p.emitidoUsd ? pct(r2(100 * p.cobradoUsd / p.emitidoUsd)) : '—'] })));
+  }
+  l.firmas(['Presidencia', 'Tesorería']);
   return l.terminar();
 }

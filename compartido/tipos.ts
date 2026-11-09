@@ -157,7 +157,7 @@ export type CambiosMarca = Partial<Omit<Marca, 'logoUrl' | 'fotoEntradaUrl'>> & 
 
 export type TipoDocumento =
   | 'estado_cuenta' | 'recibo' | 'solvencia' | 'relacion_gastos' | 'acta_votacion'
-  | 'convocatoria' | 'morosidad' | 'libro_ingresos_egresos' | 'circular';
+  | 'convocatoria' | 'morosidad' | 'libro_ingresos_egresos' | 'circular' | 'reporte_mensual';
 export interface NuevoDocumento {
   tipo: TipoDocumento; formato: 'pdf' | 'xlsx';
   unidadId?: string; periodo?: string; votacionId?: string; sha256?: string;
@@ -259,13 +259,13 @@ export type EventoTiempoReal =
 
 // ---------------- v0.4: notificaciones ----------------
 export type TipoNotificacion = 'pago_reportado' | 'pago_confirmado' | 'pago_rechazado' | 'pagos_pendientes' | 'chat_vecinos' | 'general'
-  | 'alerta' | 'alerta_cerrada' | 'solicitud_ingreso' | 'difusion';
+  | 'alerta' | 'alerta_cerrada' | 'solicitud_ingreso' | 'difusion' | 'cierre_mes' | 'tasa_bcv';
 export interface Notificacion {
   id: string; tipo: TipoNotificacion; condominioId: string | null;
   titulo: string; cuerpo: string;
   datos: { pagoId?: string; alertaId?: string; tipoAlerta?: TipoAlerta;
-           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos' | 'partidas' | 'avisos'; pendientes?: number;
-           partidaId?: string; difusionId?: string };
+           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos' | 'partidas' | 'avisos' | 'cierre' | 'tasa'; pendientes?: number;
+           partidaId?: string; difusionId?: string; periodo?: string };
   leida: boolean; creadoEn: string;
 }
 export interface BandejaNotificaciones { noLeidas: number; notificaciones: Notificacion[] }

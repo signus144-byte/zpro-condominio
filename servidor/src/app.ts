@@ -60,7 +60,7 @@ export async function construirApp(cfg: Config, dep: Dependencias = {}): Promise
 
   app.get('/salud', async () => {
     await pool.query('select 1');
-    return { ok: true, version: '0.6.0' };
+    return { ok: true, version: '0.7.0' };
   });
 
   await app.register(async (api) => {

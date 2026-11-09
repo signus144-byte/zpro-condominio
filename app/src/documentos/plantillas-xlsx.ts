@@ -1,8 +1,9 @@
 // Plantillas Excel (.xlsx) con la marca del condominio.
 // Solo valores, formatos de número y SUMA(): se abren igual en Excel, Google Sheets y LibreOffice.
 import ExcelJS from 'exceljs';
-import type { EstadoCuenta, Gasto, UnidadConSaldo } from '../data/tipos';
+import type { EstadoCuenta, Gasto, ReporteDelMes, UnidadConSaldo } from '../data/tipos';
 import {
+  libroDelMes,
   ESTADO_PAGO, METODOS, PIE, TIPO_CARGO, aBase64, argb, etiquetaUnidad, fechaCorta, hexARgb, mesLargo, r2,
   type MarcaDoc, type OpcionesDoc,
 } from './comun';
@@ -192,5 +193,106 @@ export async function morosidadXlsx(marca: MarcaDoc, unidades: UnidadConSaldo[],
   n.value = `${morosas.length} de ${unidades.length} unidades con saldo pendiente${t ? ` · tasa BCV ${t.toLocaleString('es-VE')} Bs/$` : ''}`;
   n.font = { name: 'Arial', size: 9 };
   pie(ws, fin + 1, o.codigo);
+  return bytes(wb);
+}
+
+
+// ---------------- Reporte del mes (cierre) ----------------
+const ESTADO_CASA_X: Record<string, string> = { al_dia: 'Al día', debe: 'Debe', a_favor: 'A favor' };
+const RECIBO_X: Record<string, string> = { pagado: 'Pagado', parcial: 'Abonado', pendiente: 'Pendiente', sin_recibo: 'Sin recibo' };
+
+function hojaLibro(wb: ExcelJS.Workbook, marca: MarcaDoc, rep: ReporteDelMes, o: OpcionesDoc) {
+  const d = rep.datos;
+  const cols: Col[] = [
+    { titulo: 'Fecha', ancho: 12, fmt: FMT_FECHA }, { titulo: 'Tipo', ancho: 10 }, { titulo: 'Concepto', ancho: 30 }, { titulo: 'Detalle', ancho: 40 },
+    { titulo: 'Moneda', ancho: 8 }, { titulo: 'Monto', ancho: 15, fmt: '#,##0.00' }, { titulo: 'Tasa BCV', ancho: 11, fmt: '#,##0.0000' },
+    { titulo: 'Ingreso ($)', ancho: 14, fmt: FMT_USD }, { titulo: 'Egreso ($)', ancho: 14, fmt: FMT_USD }, { titulo: 'Acumulado ($)', ancho: 15, fmt: FMT_USD },
+  ];
+  const { ws } = hojaConMarca(wb, 'Libro', marca, `Libro de ingresos y egresos · ${mesLargo(d.periodo)}`, cols, o);
+  const libro = libroDelMes(d);
+  const fin = agregarFilas(ws, cols, libro.map((f) => [fechaXl(f.fecha), f.tipo, f.concepto, f.detalle, f.moneda === 'USD' ? '$' : 'Bs', f.monto, f.tasa,
+    f.ingresoUsd || null, f.egresoUsd || null, null]));
+  // Acumulado con fórmula (se recalcula si alguien corrige un monto)
+  for (let i = 8; i < fin; i++) ws.getCell(i, 10).value = { formula: i === 8 ? `N(H8)-N(I8)` : `J${i - 1}+N(H${i})-N(I${i})` };
+  filaTotal(ws, cols, fin, 8, fin - 1, [8, 9], 'TOTAL DEL MES');
+  pie(ws, fin, o.codigo);
+}
+
+export async function reporteMensualXlsx(marca: MarcaDoc, rep: ReporteDelMes, o: OpcionesDoc = {}): Promise<Uint8Array> {
+  const wb = new ExcelJS.Workbook();
+  const d = rep.datos, r = d.resumen;
+  const titulo = `Reporte del mes · ${mesLargo(d.periodo)}${rep.cerrado ? ` · cerrado el ${fechaCorta(rep.cerrado.en)}` : ' · provisional'}`;
+  const colsR: Col[] = [{ titulo: 'Concepto', ancho: 40 }, { titulo: 'Valor', ancho: 18, fmt: '#,##0.00' }];
+  const res = hojaConMarca(wb, 'Resumen', marca, titulo, colsR, o);
+  const finR = agregarFilas(res.ws, colsR, [
+    ['Facturado del mes ($)', r.facturadoUsd], ['Cobrado: pagos aprobados ($)', r.cobradoUsd], ['  …en bolívares (Bs)', r.cobradoBs],
+    ['  …en divisas ($)', r.cobradoDivisasUsd], ['Gastos del mes ($)', r.gastosUsd], ['Resultado del mes ($)', r2(r.cobradoUsd - r.gastosUsd)],
+    ['Deuda al inicio ($)', r.deudaInicialUsd], ['Deuda al cierre ($)', r.deudaFinalUsd], ['Saldo a favor de las casas ($)', r.aFavorUsd],
+    ['Casas', r.totalCasas], ['Casas al día', r.casasAlDia], ['Casas con deuda', r.casasConDeuda],
+    ['Pagos aprobados', r.pagosAprobados], ['Pagos rechazados', r.pagosRechazados], ['Pagos en revisión', r.pagosEnRevision],
+    ['Fondo de reserva facturado acumulado ($)', d.fondoReserva.facturadoAcumUsd], ['Fondo de reserva cobrado acumulado ($)', d.fondoReserva.cobradoAcumUsd],
+    ...(d.tasaBcv ? [[`Tasa BCV de referencia (Bs/$)${d.tasaFecha ? `, fecha valor ${fechaCorta(d.tasaFecha)}` : ''}`, d.tasaBcv] as (string | number)[]] : []),
+  ]);
+  pie(res.ws, finR, o.codigo);
+
+  const colsC: Col[] = [
+    { titulo: 'Casa', ancho: 11 }, { titulo: 'Propietario', ancho: 26 }, { titulo: 'Alícuota', ancho: 10, fmt: FMT_PCT },
+    { titulo: 'Saldo anterior ($)', ancho: 16, fmt: FMT_USD }, { titulo: 'Facturado ($)', ancho: 14, fmt: FMT_USD }, { titulo: 'Pagado ($)', ancho: 14, fmt: FMT_USD },
+    { titulo: 'Saldo al cierre ($)', ancho: 16, fmt: FMT_USD }, { titulo: 'Estado', ancho: 10 }, { titulo: 'Recibo del mes', ancho: 14 },
+    { titulo: 'Rechazados', ancho: 11, fmt: '0' }, { titulo: 'En revisión', ancho: 11, fmt: '0' },
+  ];
+  const ca = hojaConMarca(wb, 'Casas', marca, titulo, colsC, o);
+  const finC = agregarFilas(ca.ws, colsC, d.casas.map((c) => [c.etiqueta.replace(/^Apto /, ''), c.propietario ?? '', c.alicuota, c.saldoAnteriorUsd, c.facturadoUsd,
+    c.pagadoUsd, c.saldoFinalUsd, ESTADO_CASA_X[c.estado], c.recibo === 'pagado' && c.estado === 'debe' ? 'Pagado después del cierre' : RECIBO_X[c.recibo], c.pagosRechazados, c.pagosEnRevision]));
+  for (let i = 8; i < finC; i++) if (d.casas[i - 8].estado === 'debe') ca.ws.getCell(i, 7).font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFB42318' } };
+  filaTotal(ca.ws, colsC, finC, 8, finC - 1, [4, 5, 6, 7]);
+  pie(ca.ws, finC, o.codigo);
+
+  const colsP: Col[] = [
+    { titulo: 'Fecha', ancho: 12, fmt: FMT_FECHA }, { titulo: 'Casa', ancho: 10 }, { titulo: 'Método', ancho: 14 }, { titulo: 'Referencia', ancho: 14 },
+    { titulo: 'Moneda', ancho: 8 }, { titulo: 'Monto', ancho: 15, fmt: '#,##0.00' }, { titulo: 'Tasa BCV', ancho: 11, fmt: '#,##0.0000' },
+    { titulo: 'Equivale ($)', ancho: 13, fmt: FMT_USD }, { titulo: 'Estado', ancho: 13 }, { titulo: 'Se descontó de / motivo del rechazo', ancho: 50 },
+  ];
+  const pa = hojaConMarca(wb, 'Pagos', marca, titulo, colsP, o);
+  const finP = agregarFilas(pa.ws, colsP, d.pagos.map((p) => [fechaXl(p.fechaPago), p.unidad.replace(/^Apto /, ''), METODOS[p.metodo] ?? p.metodo, p.referencia ?? '',
+    p.moneda === 'USD' ? '$' : 'Bs', p.monto, p.tasaBcv, p.montoUsd, ESTADO_PAGO[p.estado] ?? p.estado,
+    p.estado === 'rechazado' ? `Rechazado: ${p.motivoRechazo ?? ''}` : p.aplicadoA.map((a) => `${a.concepto} ($${a.montoUsd.toFixed(2)})`).join('; ')]));
+  pie(pa.ws, finP, o.codigo);
+
+  const colsG: Col[] = [
+    { titulo: 'Fecha', ancho: 12, fmt: FMT_FECHA }, { titulo: 'Categoría', ancho: 18 }, { titulo: 'Descripción', ancho: 38 }, { titulo: 'Cuenta', ancho: 22 },
+    { titulo: 'Moneda', ancho: 8 }, { titulo: 'Monto', ancho: 15, fmt: '#,##0.00' }, { titulo: 'Tasa BCV', ancho: 11, fmt: '#,##0.0000' }, { titulo: 'Monto ($)', ancho: 14, fmt: FMT_USD },
+  ];
+  const ga = hojaConMarca(wb, 'Gastos', marca, titulo, colsG, o);
+  const finG = agregarFilas(ga.ws, colsG, d.gastos.map((g) => [fechaXl(g.fecha), g.categoria, g.descripcion, g.cuenta ?? '', g.moneda === 'USD' ? '$' : 'Bs', g.monto, g.tasaBcv, g.montoUsd]));
+  filaTotal(ga.ws, colsG, finG, 8, finG - 1, [8]);
+  pie(ga.ws, finG, o.codigo);
+
+  hojaLibro(wb, marca, rep, o);
+
+  const colsK: Col[] = [
+    { titulo: 'Cuenta', ancho: 30 }, { titulo: 'Moneda', ancho: 9 }, { titulo: 'Saldo inicial', ancho: 16, fmt: '#,##0.00' },
+    { titulo: 'Entradas', ancho: 16, fmt: '#,##0.00' }, { titulo: 'Salidas', ancho: 16, fmt: '#,##0.00' }, { titulo: 'Saldo final', ancho: 16, fmt: '#,##0.00' },
+  ];
+  const cu = hojaConMarca(wb, 'Cuentas', marca, titulo, colsK, o);
+  const finK = agregarFilas(cu.ws, colsK, d.cuentas.map((c) => [c.nombre, c.moneda === 'USD' ? '$' : 'Bs', c.saldoInicial, c.entradas, c.salidas, c.saldoFinal]));
+  pie(cu.ws, finK, o.codigo);
+
+  if (d.partidas.length) {
+    const colsE: Col[] = [
+      { titulo: 'Cuota especial', ancho: 36 }, { titulo: 'Casas', ancho: 8, fmt: '0' }, { titulo: 'Presupuesto ($)', ancho: 16, fmt: FMT_USD },
+      { titulo: 'Emitido ($)', ancho: 14, fmt: FMT_USD }, { titulo: 'Cobrado ($)', ancho: 14, fmt: FMT_USD }, { titulo: '% cobrado', ancho: 11, fmt: FMT_PCT },
+    ];
+    const pe = hojaConMarca(wb, 'Cuotas especiales', marca, titulo, colsE, o);
+    const finE = agregarFilas(pe.ws, colsE, d.partidas.map((p) => [p.titulo, p.casas, p.presupuestoUsd, p.emitidoUsd, p.cobradoUsd, p.emitidoUsd ? r2(100 * p.cobradoUsd / p.emitidoUsd) : 0]));
+    pie(pe.ws, finE, o.codigo);
+  }
+  return bytes(wb);
+}
+
+/** Solo el libro de ingresos y egresos del mes. */
+export async function libroIngresosEgresosXlsx(marca: MarcaDoc, rep: ReporteDelMes, o: OpcionesDoc = {}): Promise<Uint8Array> {
+  const wb = new ExcelJS.Workbook();
+  hojaLibro(wb, marca, rep, o);
   return bytes(wb);
 }

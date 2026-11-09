@@ -10,6 +10,7 @@ import type {
   UnidadConSaldo, Yo, Aviso, BandejaNotificaciones, Notificacion,
   AlertaVecinal, CercaniaUnidad, ConfigAlerta, EnlaceInvitacion, InfoInvitacion, ParticipanteAlerta,
   Difusion, GrupoUnidades, PreviaDifusion, UnidadAlcance,
+  CierreMes, CobroPartidaCasa, LecturaTasa, ReporteDelMes, ResultadoConfirmarTasa, TasaBcv,
 } from './tipos';
 
 const JUNTA: Rol[] = ['presidente', 'tesorero', 'vocal', 'administrador'];
@@ -340,8 +341,9 @@ export function crearApiServidor(base: string): Api {
     condominio: () => pedir<Condominio>('GET', c()),
     async cuentasDePago() { return (await pedir<CuentaFinanciera[]>('GET', c('/cuentas'))).filter((x) => x.datosPago); },
     cuentasFinancieras: () => pedir<CuentaFinanciera[]>('GET', c('/cuentas')),
-    tasaBcv: () => pedir('GET', 'tasa-bcv'),
-    async fijarTasaBcv(usdVes) { await pedir('POST', c('/tasa-bcv'), { usdVes }); },
+    tasaBcv: (fecha) => pedir<TasaBcv>('GET', `tasa-bcv${fecha ? `?fecha=${fecha}` : ''}`),
+    fijarTasaBcv: (usdVes, fecha) => pedir<ResultadoConfirmarTasa>('POST', c('/tasa-bcv'), { usdVes, ...(fecha ? { fecha } : {}) }),
+    lecturasTasa: () => pedir<LecturaTasa[]>('GET', c('/tasa-bcv/lecturas')),
     avisos: () => pedir<Aviso[]>('GET', c('/avisos')),
     async crearAviso(a) { await pedir('POST', c('/avisos'), { ...a }); },
     async borrarAviso(id) { await pedir('DELETE', c(`/avisos/${id}`)); },
@@ -353,13 +355,14 @@ export function crearApiServidor(base: string): Api {
       await pedir('POST', c('/pagos'), formulario({
         unidadId: p.unidadId, fechaPago: p.fechaPago, metodo: p.metodo, moneda: p.moneda, monto: p.monto,
         referencia: p.referencia, bancoOrigen: p.bancoOrigen, cuentaDestinoId: p.cuentaDestinoId, nota: p.nota,
+        cargoIds: p.cargoIds?.length ? JSON.stringify(p.cargoIds) : undefined,
       }, { comprobante: p.comprobante }));
     },
 
     // ---- Finanzas ----
     panel: () => pedir<ResumenPanel>('GET', c('/panel')),
-    pagos: (filtro) => pedir<Pago[]>('GET', c(`/pagos?estado=${filtro}`)),
-    async confirmarPago(id) { await pedir('POST', c(`/pagos/${id}/confirmar`), {}); },
+    pagos: (filtro, mes) => pedir<Pago[]>('GET', c(`/pagos?estado=${filtro}${mes ? `&mes=${mes}` : ''}`)),
+    async confirmarPago(id, cargoIds) { await pedir('POST', c(`/pagos/${id}/confirmar`), cargoIds ? { cargoIds } : {}); },
     async rechazarPago(id, motivo) { await pedir('POST', c(`/pagos/${id}/rechazar`), { motivo }); },
     gastos: (periodo) => pedir<Gasto[]>('GET', c(`/gastos?periodo=${periodo}`)),
     async registrarGasto(g) {
@@ -370,6 +373,9 @@ export function crearApiServidor(base: string): Api {
     },
     async generarRecibos(periodo) { return (await pedir<{ emitidos: number }>('POST', c('/recibos'), { periodo })).emitidos; },
     unidadesConSaldo: () => pedir<UnidadConSaldo[]>('GET', c('/unidades')),
+    reporteMensual: (periodo) => pedir<ReporteDelMes>('GET', c(`/reportes/mensual?periodo=${periodo}`)),
+    async cerrarMes(periodo) { await pedir('POST', c('/reportes/mensual/cerrar'), { periodo }); },
+    cierres: () => pedir<CierreMes[]>('GET', c('/cierres')),
 
     movimientosBancarios: (soloPendientes) =>
       pedir<MovimientoBancario[]>('GET', c(`/conciliacion/movimientos${soloPendientes ? '?pendientes=1' : ''}`)),
@@ -390,6 +396,7 @@ export function crearApiServidor(base: string): Api {
 
     // ---- Partidas ----
     partidas: () => pedir<Partida[]>('GET', c('/partidas')),
+    cobroPartida: (pid) => pedir<CobroPartidaCasa[]>('GET', c(`/partidas/${pid}/cobro`)),
     crearPartida: (p) => pedir<{ id: string; difusion: DifusionEnviada | null }>('POST', c('/partidas'), { ...p }),
     async votar(vid, opcionId) { await pedir('POST', c(`/votaciones/${vid}/votar`), { opcionId }); },
     async cerrarVotacion(vid) { return (await pedir<{ aprobada: boolean }>('POST', c(`/votaciones/${vid}/cerrar`), {})).aprobada; },

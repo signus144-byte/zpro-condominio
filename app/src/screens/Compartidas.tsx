@@ -1,7 +1,7 @@
 // Pantallas que usan residentes y Presidencia, con acciones según el rol.
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { api, type AlcanceCasas, type CategoriaReporte, type EstadoReporte, type Partida, type Ponderacion, type Visibilidad } from '../data';
+import { api, type CobroPartidaCasa, type AlcanceCasas, type CategoriaReporte, type EstadoReporte, type Partida, type Ponderacion, type Visibilidad } from '../data';
 import type { DifusionEnviada } from '../data/api';
 import { SABOR } from '../sabor';
 import {
@@ -171,6 +171,55 @@ export function Partidas() {
 
 const casas = (n: number) => `${n} casa${n === 1 ? '' : 's'}`;
 
+/** Cuánto se ha recaudado de la cuota especial (todos lo ven) y, para la junta, quién pagó y quién no. */
+function AvancePartida({ p }: { p: Partida }) {
+  const s = api.sesion()!;
+  const a = p.avance!;
+  const [detalle, setDetalle] = useState<CobroPartidaCasa[] | null>(null);
+  const [cargando, setCargando] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const pctCobrado = a.emitidoUsd > 0 ? Math.min(100, (100 * a.cobradoUsd) / a.emitidoUsd) : 0;
+  const pctPresupuesto = p.presupuestoUsd > 0 ? Math.min(100, (100 * a.cobradoUsd) / p.presupuestoUsd) : 0;
+  async function ver() {
+    if (detalle) return setDetalle(null);
+    setCargando(true); setErr(null);
+    try { setDetalle(await api.cobroPartida(p.id)); } catch (e) { setErr((e as Error).message); } finally { setCargando(false); }
+  }
+  return (
+    <div className="avance-partida">
+      <div className="barra-voto-txt">
+        <span>Recaudado <strong>{usd(a.cobradoUsd)}</strong> de {usd(a.emitidoUsd)} cobrado hasta ahora</span>
+        <span>{Math.round(pctCobrado)} %</span>
+      </div>
+      <div className="barra-voto-fondo"><div style={{ width: `${pctCobrado}%` }} className="si" /></div>
+      <small className="meta">
+        {a.casasAlDia} de {casas(a.casas)} al día · {a.cuotasEmitidas} de {p.numeroCuotas} cuota{p.numeroCuotas > 1 && 's'} emitida{a.cuotasEmitidas !== 1 && 's'}
+        {' '}· {Math.round(pctPresupuesto)} % del presupuesto
+      </small>
+      {s.esJunta && (
+        <button className="btn-texto" onClick={() => void ver()} disabled={cargando}>
+          {detalle ? 'Ocultar' : cargando ? 'Cargando…' : '¿Quién ha pagado?'}
+        </button>
+      )}
+      {err && <small className="txt-error">{err}</small>}
+      {detalle && (
+        <table className="tabla">
+          <tbody>
+            {detalle.map((d) => (
+              <tr key={d.unidadId}>
+                <td>{d.etiqueta}<small>{d.propietario ?? ''}</small></td>
+                <td className="num">{d.pendienteUsd > 0.009
+                  ? <><span className="txt-error">debe {usd(d.pendienteUsd)}</span><small>pagó {usd(d.pagadoUsd)}</small></>
+                  : <Etiqueta tono="ok">Pagó {usd(d.pagadoUsd)}</Etiqueta>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 function TarjetaPartida({ p, alCambiar, resaltada }: { p: Partida; alCambiar: () => void; resaltada: boolean }) {
   const s = api.sesion()!;
   const ir = useNavigate();
@@ -207,6 +256,8 @@ function TarjetaPartida({ p, alCambiar, resaltada }: { p: Partida; alCambiar: ()
       {p.cuotaMiUnidadUsd != null && (
         <div className="datos-pago"><strong>Su aporte</strong><span>{usd(p.cuotaMiUnidadUsd)} por cuota · {usd(p.cuotaMiUnidadUsd * p.numeroCuotas)} en total</span></div>
       )}
+
+      {p.avance && <AvancePartida p={p} />}
 
       {v && (
         <div className="votacion">

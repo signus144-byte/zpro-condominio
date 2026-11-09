@@ -253,3 +253,39 @@ input[type=file] { font-size: 0.85rem; max-width: 100%; }
 .barra-condominio { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .barra-acciones { flex: none; }
 .barra-acciones .btn-texto { white-space: nowrap; }
+
+/* ---------- v0.7: tasa BCV verificada, pagar por concepto, avance de cuotas, cierre del mes ---------- */
+.tasa-linea { margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: 0.85rem; color: var(--texto-2); }
+.tasa-linea strong { color: var(--texto); font-variant-numeric: tabular-nums; }
+.tasa-ok strong::before { content: '✓ '; color: var(--ok); }
+.tasa-falta { color: var(--error); font-weight: 600; }
+.tasa-enlace { text-decoration: none; color: inherit; display: block; }
+.bloqueo-tasa { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.bloqueo-tasa p { margin: 0; }
+.btn-chico { padding: 6px 14px; min-height: 0; font-size: 0.9rem; }
+.deudas li { align-items: center; }
+.deudas li > div:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.deudas li > div:first-child .etiqueta { align-self: flex-start; margin-top: 2px; }
+.deuda-accion { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; flex-shrink: 0; }
+.deuda-accion strong, .deudas .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.monto-bs { font-variant-numeric: tabular-nums; }
+.elegible { border-radius: 10px; padding-left: 8px !important; padding-right: 8px !important; }
+.elegible.elegido { background: var(--primario-suave); }
+.check-deuda { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; flex: 1; min-width: 0; }
+.check-deuda input { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--primario); flex-shrink: 0; }
+.check-deuda span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.check-deuda .etiqueta { align-self: flex-start; }
+.lista li.total { font-weight: 700; }
+.monto-grande { background: var(--primario-suave); border-radius: var(--radio); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.monto-grande span { font-size: 0.85rem; color: var(--texto-2); }
+.monto-grande strong { font-size: 1.9rem; color: var(--primario); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.destino-pago { background: var(--superficie); border: 1px dashed var(--linea); border-radius: 10px; padding: 8px 12px; font-size: 0.88rem; display: flex; flex-direction: column; gap: 4px; }
+.destino-pago ul { margin: 0; padding-left: 18px; }
+.destino-pago li small { margin-left: 6px; }
+.aplicado { color: var(--ok) !important; }
+.avance-partida { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--linea); }
+.avance-partida .btn-texto { align-self: flex-start; padding-left: 0; }
+.cierre-estado { display: flex; justify-content: center; }
+button.acceso { border: none; text-align: left; font: inherit; cursor: pointer; }
+.acceso-error { background: var(--error-suave); color: var(--error); }
+.lista li.clicable { cursor: pointer; }

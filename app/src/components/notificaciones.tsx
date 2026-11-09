@@ -34,6 +34,8 @@ export function destinoNotificacion(n: Notificacion, prefijo: string): string {
     case 'accesos': return s?.esJunta && SABOR !== 'miembros' ? '/p/accesos' : prefijo;
     case 'partidas': return `${prefijo}/partidas${n.datos.partidaId ? `?p=${n.datos.partidaId}` : ''}`;
     case 'avisos': return `${prefijo}/notificacion/${n.id}`;
+    case 'cierre': return s?.esJunta && SABOR !== 'miembros' ? `/p/cierre${n.datos.periodo ? `?periodo=${n.datos.periodo}` : ''}` : prefijo;
+    case 'tasa': return s?.esJunta && SABOR !== 'miembros' ? '/p/tasa' : prefijo;
     default: return prefijo;
   }
 }
@@ -98,7 +100,7 @@ export function Campana() {
 
 const TONO: Record<Notificacion['tipo'], string> = {
   pago_confirmado: 'ok', pago_rechazado: 'error', pago_reportado: 'info', pagos_pendientes: 'alerta', chat_vecinos: 'info', general: 'info',
-  alerta: 'error', alerta_cerrada: 'ok', solicitud_ingreso: 'alerta', difusion: 'info',
+  alerta: 'error', alerta_cerrada: 'ok', solicitud_ingreso: 'alerta', difusion: 'info', cierre_mes: 'ok', tasa_bcv: 'alerta',
 };
 
 export function Notificaciones() {

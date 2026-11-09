@@ -1,4 +1,4 @@
-# Contrato de la API · Vecinos ZPro v0.6
+# Contrato de la API · Vecinos ZPro v0.7
 
 Base: `/api/v1`. JSON en camelCase. Los tipos de respuesta están en `compartido/tipos.ts` (app) y
 `compartido/plataforma.ts` (consola): **el servidor devuelve exactamente esos tipos**.
@@ -37,8 +37,9 @@ Base: `/api/v1`. JSON en camelCase. Los tipos de respuesta están en `compartido
 | GET `c/:cid/marca` | — | `Marca` |
 | PATCH `c/:cid/marca` | multipart: campos de `Marca` + archivos `logo`, `fotoEntrada` | 204 |
 | GET `c/:cid/cuentas` | — | `CuentaFinanciera[]` |
-| GET `tasa-bcv` | — | `{fecha, usdVes} \| null` |
-| POST `c/:cid/tasa-bcv` | `{usdVes, fecha?}` | 204 (junta con finanzas) |
+| GET `tasa-bcv?fecha=` | — | `TasaBcv` (v0.7): tasa que rige ese día (por defecto hoy en Caracas). `usdVes = null` si **no hay dos fuentes que coincidan** o no se comprobó vigente ese día; `motivo` lo explica |
+| POST `c/:cid/tasa-bcv` | `{usdVes, fecha?}` | `ResultadoConfirmarTasa` (junta con finanzas). La junta cuenta como **una** fuente; con otra que coincida queda verificada |
+| GET `c/:cid/tasa-bcv/lecturas` | — | `LecturaTasa[]`: qué dijo cada fuente en 24 h (junta) |
 | GET `c/:cid/avisos` · POST · DELETE `c/:cid/avisos/:id` | `{titulo, cuerpo, fijado?}` | `Aviso[]` · 201 `{id}` · 204 |
 | POST `archivos/firmar` | `{bucket, nombre}` | `{url}` |
 | GET `archivos/f/:token` | — | bytes del archivo |
@@ -50,9 +51,12 @@ Base: `/api/v1`. JSON en camelCase. Los tipos de respuesta están en `compartido
 | GET `c/:cid/panel` | — | `ResumenPanel` (junta) |
 | GET `c/:cid/unidades` | — | `UnidadConSaldo[]` (junta: todas; residente: la suya) |
 | GET `c/:cid/unidades/:uid/estado-cuenta` | — | `EstadoCuenta` (`comprobanteUrl` firmada) |
-| GET `c/:cid/pagos?estado=reportado\|todos` | — | `Pago[]` (junta) |
-| POST `c/:cid/pagos` | multipart: `unidadId, fechaPago, metodo, moneda, monto, referencia?, bancoOrigen?, cuentaDestinoId?, nota?` + archivo `comprobante` | 201 `{id}` |
-| POST `c/:cid/pagos/:id/confirmar` | `{cuentaDestinoId?}` | 204 |
+| GET `c/:cid/pagos?estado=reportado\|todos&mes=AAAA-MM-01` | — | `Pago[]` (junta) con `destinos` (lo elegido) y `aplicaciones` (cómo se descontó) |
+| POST `c/:cid/pagos` | multipart: `unidadId, fechaPago, metodo, moneda, monto, referencia?, bancoOrigen?, cuentaDestinoId?, nota?, cargoIds?` (JSON `["id",…]` o `id1,id2`) + archivo `comprobante` | 201 `{id}` · en Bs: 400 si la tasa BCV de `fechaPago` no está verificada |
+| POST `c/:cid/pagos/:id/confirmar` | `{cuentaDestinoId?, cargoIds?}` | 204 · `cargoIds` cambia a qué deudas va antes de aprobar |
+| GET `c/:cid/reportes/mensual?periodo=` | — | `ReporteDelMes` (junta): el cierre guardado o, si no se ha cerrado, en vivo |
+| POST `c/:cid/reportes/mensual/cerrar` | `{periodo}` | `{cerradoEn}` (finanzas; solo meses terminados; se puede volver a cerrar) |
+| GET `c/:cid/cierres` | — | `CierreMes[]` |
 | POST `c/:cid/pagos/:id/rechazar` | `{motivo}` | 204 |
 | GET `c/:cid/gastos?periodo=` | — | `Gasto[]` (todos los miembros; `facturaUrl` firmada) |
 | POST `c/:cid/gastos` | multipart: campos de `NuevoGasto` + archivo `factura` | 201 `{id}` |
@@ -65,6 +69,8 @@ Base: `/api/v1`. JSON en camelCase. Los tipos de respuesta están en `compartido
 | POST `c/:cid/zentapro/facturas/:id/pagos` | `{metodo: 'pago_movil'\|'transferencia', montoVes, referencia, fechaPago?}` | 201 · **solo bolívares**, convertidos a la tasa BCV del día del pago; abonos parciales |
 
 ## 4. Partidas y votaciones (`src/rutas/partidas.ts`) ✅
+
+v0.7: cada `Partida` trae `avance` (emitido, cobrado, casas al día). GET `c/:cid/partidas/:pid/cobro` → `CobroPartidaCasa[]` (junta): quién pagó y quién no.
 
 | Método y ruta | Cuerpo | Respuesta |
 |---|---|---|
@@ -235,14 +241,17 @@ Pruebas: `pruebas/webhook.test.ts` (6).
 
 ## 11. Tareas programadas (`src/tareas/`) ✅ — `croner`, hora de Caracas
 
-Funciones exportadas y probadas (`pruebas/tareas.test.ts`, 8): `actualizarTasaBcv(ctx, fetch?)` (guarda con la "Fecha Valor" del BCV),
-`extraerTasaBcv(html)`, `purgarChat(ctx)` (también borra la fila de `storage.objects`), `facturarMes(ctx, fecha)`, `suspenderMorosos(ctx, dias)`,
+Funciones exportadas y probadas (`pruebas/tareas.test.ts`): `actualizarTasaBcv(ctx, fetch?)` (lee BCV y DolarApi, registra cada lectura y
+`consolidar_tasa()` decide: solo con dos fuentes que coinciden), `extraerTasaBcv(html)`, `extraerDolarApi(json)`, `avisarTasaSinVerificar(ctx)`,
+`cierreAutomatico(ctx)`, `purgarChat(ctx)` (también borra la fila de `storage.objects`), `facturarMes(ctx, fecha)`, `suspenderMorosos(ctx, dias)`,
 `recordarPagosPendientes(ctx)`.
 Push en `src/push.ts` (`crearPush`), llamado por el hub de tiempo real en cada mensaje nuevo y cambio de estado de pago.
 
 | Tarea | Cuándo | Qué |
 |---|---|---|
-| Tasa BCV | lun–vie 9:30 y 17:30 | Lee bcv.org.ve y guarda en `tasas_bcv` |
+| Tasa BCV | cada 30 min, todos los días, y al arrancar | Lee bcv.org.ve y DolarApi → `lecturas_tasa` → `consolidar_tasa()`. Certificado intermedio del BCV opcional: `BCV_CA_EXTRA=/ruta.pem` (nunca se apaga TLS) |
+| Aviso de tasa | 9:05 y 13:05 | `avisar_tasa_sin_verificar()`: si hoy no hay tasa con dos fuentes, avisa a la junta (una vez al día) |
+| Cierre del mes | día 1, 7:30 | `cierre_automatico()`: guarda el reporte del mes anterior y avisa a la junta |
 | Purga | 3:00 | `purgar_adjuntos_vencidos()` + borrar bytes; `purgar_mensajes_antiguos()`; archivos huérfanos |
 | Facturación ZentaPro | día 1, 6:00 | `facturar_condominio()` a cada condominio activo |
 | Suspensión | diario 7:00 | `suspender_morosos_plataforma(10)` |

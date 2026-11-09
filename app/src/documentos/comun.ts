@@ -1,6 +1,6 @@
 // Utilidades compartidas por todas las plantillas (PDF y Excel).
 // TypeScript puro: corre en el navegador, en Capacitor y en Node (tsx).
-import type { Marca, Unidad } from '../data/tipos';
+import type { Marca, ReporteMensual, Unidad } from '../data/tipos';
 
 export interface ImagenDoc { bytes: Uint8Array; tipo: 'png' | 'jpg' }
 
@@ -19,7 +19,7 @@ export interface OpcionesDoc {
 
 export const URL_VERIFICAR = 'https://zentapro.com/verificar';
 export const PIE = (codigo?: string | null) =>
-  `Documento generado por ZPro Condominio · Verifique en zentapro.com/verificar${codigo ? ` · código ${codigo}` : ''}`;
+  `Documento generado por Vecinos ZPro · Verifique en zentapro.com/verificar${codigo ? ` · código ${codigo}` : ''}`;
 
 // ---------------- Formatos ----------------
 const numF = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -116,4 +116,24 @@ export async function cargarImagen(url: string | null | undefined): Promise<Imag
 export async function prepararMarca(m: Marca): Promise<MarcaDoc> {
   const [logo, fotoEntrada] = await Promise.all([cargarImagen(m.logoUrl), cargarImagen(m.fotoEntradaUrl)]);
   return { ...m, logo, fotoEntrada };
+}
+
+
+// ---------------- Libro de ingresos y egresos del mes ----------------
+/** Ingresos = pagos aprobados (con fecha de pago en el mes); egresos = gastos del mes. Orden por fecha, con acumulado en $. */
+export interface FilaLibro { fecha: string; tipo: 'Ingreso' | 'Egreso'; concepto: string; detalle: string; moneda: 'USD' | 'VES'; monto: number; tasa: number | null; ingresoUsd: number; egresoUsd: number; acumuladoUsd: number }
+export function libroDelMes(r: ReporteMensual): FilaLibro[] {
+  const filas: Omit<FilaLibro, 'acumuladoUsd'>[] = [
+    ...r.pagos.filter((p) => p.estado === 'confirmado').map((p) => ({
+      fecha: p.fechaPago, tipo: 'Ingreso' as const, concepto: `Pago ${p.unidad}`,
+      detalle: [METODOS[p.metodo] ?? p.metodo, p.referencia ? `ref. ${p.referencia}` : '', p.aplicadoA.map((a) => a.concepto).join(', ')].filter(Boolean).join(' · '),
+      moneda: p.moneda, monto: p.monto, tasa: p.tasaBcv, ingresoUsd: p.montoUsd, egresoUsd: 0,
+    })),
+    ...r.gastos.map((g) => ({
+      fecha: g.fecha, tipo: 'Egreso' as const, concepto: g.descripcion, detalle: [g.categoria, g.cuenta ?? ''].filter(Boolean).join(' · '),
+      moneda: g.moneda, monto: g.monto, tasa: g.tasaBcv, ingresoUsd: 0, egresoUsd: g.montoUsd,
+    })),
+  ].sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.tipo === 'Ingreso' ? -1 : 1));
+  let acc = 0;
+  return filas.map((f) => { acc = r2(acc + f.ingresoUsd - f.egresoUsd); return { ...f, acumuladoUsd: acc }; });
 }

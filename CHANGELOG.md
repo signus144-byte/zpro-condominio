@@ -1,5 +1,18 @@
 # Historial de versiones · Vecinos ZPro
 
+## 0.7 · 9-nov-2026 · Tasa BCV garantizada, pago por concepto y cierre del mes
+- **Tasa BCV con dos fuentes.** El servidor consulta cada 30 minutos (todos los días y al arrancar) la página del BCV y DolarApi. La tasa solo se acepta si **las dos dan el mismo número**; si una no responde o no coinciden, no hay tasa y los vecinos **no pueden reportar pagos en bolívares** (en dólares sí). La junta puede servir de segunda fuente copiando el número de bcv.org.ve (toda la junta cuenta como una sola fuente). Si a las 9:05 no hay tasa confirmada, la junta recibe un aviso.
+- Respeta la **fecha valor** del BCV: la tasa publicada el viernes en la tarde rige desde el lunes; el fin de semana sigue la del viernes.
+- La app **siempre consulta la tasa al abrir la pantalla de pago y al volver a la app**; sin internet dice "Conéctese a internet" y no muestra montos en Bs. Antes de enviar, vuelve a comprobarla.
+- En modo demostración el teléfono consulta las mismas dos fuentes: ya no hay tasa ficticia.
+- **El vecino elige qué paga**: "¿Qué quiere pagar?" con la cuota del mes y cada cuota especial por separado, botón **Pagar** que lleva al formulario con el **monto en Bs ya calculado** con la tasa del día.
+- **Al aprobar, el pago se descuenta de lo elegido**; lo que sobra va a la deuda más antigua y, si no hay, queda a favor y se descuenta solo del próximo recibo. La junta ve a qué lo destinó el vecino y puede cambiarlo antes de aprobar. El aviso al vecino dice de qué se descontó.
+- Cada recibo y cada cargo muestran **Pagado / Abonado / Pendiente**.
+- **Avance de cada cuota especial**: barra de recaudación, casas al día, y para la junta la lista de quién pagó y quién debe.
+- **Reporte y cierre del mes**: quién pagó y quién no, pagos aprobados / rechazados / en revisión, ingresos, gastos, saldos de las cuentas, fondo de reserva y cuotas especiales. Se ve en la app mes a mes, se descarga en **PDF** (para firma y sello) y **Excel**, con **libro de ingresos y egresos**. El día 1 se cierra solo el mes anterior; la junta puede volver a cerrarlo si aprueba pagos tarde.
+- Pagos de la junta filtrables por mes.
+- 152 pruebas de la API + reglas SQL, todas pasan.
+
 ## 0.6 · 8-nov-2026 · Votaciones por sector y mensajes masivos
 - **Cuotas especiales para algunas casas**: una calle con portón propio, un piso con su llave, o casas elegidas. Solo esas casas ven la cuota y su votación, solo sus propietarios votan (el porcentaje se mide sobre ellas), el acta lista solo esas casas y el recibo cobra solo a ellas, repartido entre ellas.
 - **Mensajes masivos** de la junta: a todo el condominio, a un grupo guardado, a casas elegidas, a las casas de una cuota especial o solo a las que aún no han votado; vista previa de cuántas casas y personas lo recibirán; opción "solo propietarios"; historial. Al crear una cuota especial se avisa de una vez a las casas incluidas.

@@ -11,7 +11,7 @@ const Codigo = z.string().trim().regex(/^[A-Za-z0-9]{6,16}$/, 'código inválido
 const NOMBRES: Record<string, string> = {
   estado_cuenta: 'Estado de cuenta', recibo: 'Recibo de condominio', solvencia: 'Solvencia', relacion_gastos: 'Relación de gastos',
   acta_votacion: 'Acta de votación', convocatoria: 'Convocatoria', morosidad: 'Reporte de morosidad',
-  libro_ingresos_egresos: 'Libro de ingresos y egresos', circular: 'Circular',
+  libro_ingresos_egresos: 'Libro de ingresos y egresos', circular: 'Circular', reporte_mensual: 'Reporte del mes',
 };
 
 interface Verificacion { tipo: string; condominio: string; unidad: string | null; emitidoEn: string; vigente: boolean }
@@ -26,7 +26,7 @@ export default async function rutasDocumentos(app: FastifyInstance) {
   app.post('/c/:cid/documentos', async (req) => {
     const { cid } = ParamsC.parse(req.params);
     const d = z.object({
-      tipo: z.enum(['estado_cuenta', 'recibo', 'relacion_gastos', 'acta_votacion', 'convocatoria', 'morosidad', 'libro_ingresos_egresos', 'circular']),
+      tipo: z.enum(['estado_cuenta', 'recibo', 'relacion_gastos', 'acta_votacion', 'convocatoria', 'morosidad', 'libro_ingresos_egresos', 'circular', 'reporte_mensual']),
       formato: z.enum(['pdf', 'xlsx']), unidadId: Uuid.optional(), periodo: Periodo.optional(), votacionId: Uuid.optional(),
       sha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
     }).parse(req.body);

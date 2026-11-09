@@ -20,6 +20,7 @@ import { GruposCasas, MensajesMasivos, NotificacionCompleta } from './screens/pr
 import { ChatVecinos } from './screens/presidencia/Admin';
 import { CapaAlarma, ConfigAlertaJunta, DetalleAlerta, HistorialAlertas, Participacion, Sos, UbicacionCasas } from './screens/alerta/Alerta';
 import { Invitar } from './screens/presidencia/Invitar';
+import { CierreMes } from './screens/presidencia/Cierre';
 import { Invitacion } from './screens/cuenta/Invitacion';
 import { SoloOtraApp } from './screens/cuenta/Cuenta';
 import { SABOR } from './sabor';
@@ -155,6 +156,7 @@ export default function App() {
         <Route path="/p/ubicacion" element={<Protegida junta titulo="Ubicación de las casas"><UbicacionCasas /></Protegida>} />
         <Route path="/p/chat-vecinos" element={<Protegida junta titulo="Chat entre vecinos"><ChatVecinos /></Protegida>} />
         <Route path="/p/tasa" element={<Protegida junta titulo="Tasa BCV"><TasaBcv /></Protegida>} />
+        <Route path="/p/cierre" element={<Protegida junta titulo="Reporte y cierre del mes"><CierreMes /></Protegida>} />
         <Route path="*" element={<Navigate to={destino()} replace />} />
       </Routes>
     </HashRouter>

@@ -12,6 +12,9 @@ import type {
 import type { DifusionEnviada } from './api';
 import { crearChatDemo, etiquetaChat } from './demoChat';
 import { crearAlertaDemo } from './demoAlerta';
+import { aplicarUnidad, cargoConEstado, pagoConDestinos, reporteMensual as armarReporte, type PagoDemo } from './demoFinanzas';
+import { confirmarManual, consultarFuentes, lecturasActuales, sinInternet, tasaPara } from './tasaEnVivo';
+import type { ReporteDelMes, TasaBcv } from './tipos';
 
 let n = 0;
 const id = () => `demo-${++n}`;
@@ -49,11 +52,13 @@ const cuentas: CuentaFinanciera[] = [
   { id: 'c-fondo', nombre: 'Fondo de reserva', tipo: 'fondo_reserva', moneda: 'USD', datosPago: null },
 ];
 
-const tasa = { fecha: hoy(), usdVes: 215.5 };
+// Tasas FICTICIAS solo para los datos de ejemplo de meses pasados (gastos y pagos ya hechos). La tasa de HOY es la
+// real: el teléfono la consulta al BCV y a DolarApi (tasaEnVivo.ts) y sin dos fuentes no deja pagar en bolívares.
+const TASA_EJEMPLO = 850, TASA_EJEMPLO_ANTERIOR = 812.4;
 
 const gastos: Gasto[] = [];
 const cargos: Cargo[] = [];
-const pagos: (Pago & { cuentaDestinoId: string | null })[] = [];
+const pagos: PagoDemo[] = [];
 const recibosEmitidos = new Set<string>();
 const partidas: Partida[] = [];
 /** Casas a las que aplica cada cuota especial (sin entrada = todo el condominio). Igual que partida_unidades. */
@@ -68,7 +73,7 @@ const avisos: Aviso[] = [
 ];
 
 function gastoBase(periodo: string, categoria: string, descripcion: string, moneda: 'USD' | 'VES', monto: number) {
-  const t = moneda === 'VES' ? tasa.usdVes : null;
+  const t = moneda === 'VES' ? (periodo === ANTERIOR ? TASA_EJEMPLO_ANTERIOR : TASA_EJEMPLO) : null;
   gastos.push({
     id: id(), periodo, tipo: 'comun', categoria, descripcion, moneda, monto, tasaBcv: t,
     montoUsd: t ? r2(monto / t) : monto, fechaGasto: periodo, facturaUrl: null, unidadId: null, partidaId: null,
@@ -78,7 +83,7 @@ function gastoBase(periodo: string, categoria: string, descripcion: string, mone
 for (const p of [ANTERIOR, PERIODO]) {
   gastoBase(p, 'Vigilancia', 'Servicio de vigilancia', 'USD', 600);
   gastoBase(p, 'Conserjería', 'Conserje (sueldo y bono)', 'USD', 250);
-  gastoBase(p, 'Electricidad', 'Corpoelec áreas comunes', 'VES', 21550);
+  gastoBase(p, 'Electricidad', 'Corpoelec áreas comunes', 'VES', r2(100 * (p === ANTERIOR ? TASA_EJEMPLO_ANTERIOR : TASA_EJEMPLO)));
   gastoBase(p, 'Mantenimiento', 'Mantenimiento bomba de agua', 'USD', 50);
 }
 
@@ -96,7 +101,7 @@ function emitirRecibos(periodo: string): number {
       if (!meIncluye(p, u.id)) continue;                      // la cuota se cobra solo a las casas incluidas
       const idx = mesesEntre(p.primeraCuota, periodo);
       if (idx < 0 || idx >= p.numeroCuotas) continue;
-      cargos.push({ id: id(), unidadId: u.id, periodo, tipo: 'extraordinaria', concepto: `${p.titulo} (cuota ${idx + 1}/${p.numeroCuotas})`, montoUsd: cuotaDe(p, u) });
+      cargos.push({ id: id(), unidadId: u.id, periodo, tipo: 'extraordinaria', concepto: `${p.titulo} (cuota ${idx + 1}/${p.numeroCuotas})`, montoUsd: cuotaDe(p, u), partidaId: p.id });
     }
     for (const g of gastos.filter((x) => x.periodo === periodo && x.tipo === 'no_comun' && x.unidadId === u.id)) {
       cargos.push({ id: id(), unidadId: u.id, periodo, tipo: 'no_comun', concepto: g.descripcion, montoUsd: g.montoUsd });
@@ -162,13 +167,15 @@ emitirRecibos(ANTERIOR);
 emitirRecibos(PERIODO);
 
 function pagoDemo(uid: string, fecha: string, metodo: Pago['metodo'], moneda: 'USD' | 'VES', monto: number, ref: string | null, estado: Pago['estado']) {
-  const t = moneda === 'VES' ? tasa.usdVes : null;
+  const t = moneda === 'VES' ? TASA_EJEMPLO_ANTERIOR : null;
+  const pid = id();
   pagos.push({
-    id: id(), unidadId: uid, unidadEtiqueta: etiqueta(unidad(uid)), fechaPago: fecha, metodo, moneda, monto, tasaBcv: t,
+    id: pid, unidadId: uid, unidadEtiqueta: etiqueta(unidad(uid)), fechaPago: fecha, metodo, moneda, monto, tasaBcv: t,
     montoUsd: t ? r2(monto / t) : monto, referencia: ref, bancoOrigen: moneda === 'VES' ? 'Banesco' : null,
-    comprobanteUrl: null, nota: null, estado, motivoRechazo: null, creadoEn: fecha,
-    cuentaDestinoId: moneda === 'VES' ? 'c-bs' : metodo === 'zelle' ? 'c-zelle' : 'c-caja',
+    comprobanteUrl: null, nota: null, estado, motivoRechazo: null, creadoEn: fecha, revisadoEn: estado === 'confirmado' ? fecha : null,
+    cuentaDestinoId: moneda === 'VES' ? 'c-bs' : metodo === 'zelle' ? 'c-zelle' : 'c-caja', destinoIds: [],
   });
+  return pid;
 }
 // Al día: A-11, A-13, B-31. Parcial: A-14, B-33. Morosos: A-12, B-32, B-34.
 for (const uid of ['u-A11', 'u-A13', 'u-B31']) {
@@ -177,9 +184,14 @@ for (const uid of ['u-A11', 'u-A13', 'u-B31']) {
 }
 for (const uid of ['u-A14', 'u-B33']) {
   const deuda = cargos.filter((c) => c.unidadId === uid && c.periodo === ANTERIOR).reduce((s, c) => s + c.montoUsd, 0);
-  pagoDemo(uid, ANTERIOR.slice(0, 8) + '06', 'pago_movil', 'VES', r2(deuda * tasa.usdVes), `0001${uid.slice(-2)}77`, 'confirmado');
+  pagoDemo(uid, ANTERIOR.slice(0, 8) + '06', 'pago_movil', 'VES', r2(deuda * TASA_EJEMPLO_ANTERIOR), `0001${uid.slice(-2)}77`, 'confirmado');
 }
-pagoDemo('u-B32', hoy(), 'pago_movil', 'VES', 21550, '00987654', 'reportado');
+// Pagos por revisar: B-32 pagó la cuota de este mes por Zelle (eligió qué pagar); A-12 trajo efectivo sin indicar.
+{
+  const delMes = cargos.filter((c) => c.unidadId === 'u-B32' && c.periodo === PERIODO && c.tipo !== 'extraordinaria');
+  const pid = pagoDemo('u-B32', hoy(), 'zelle', 'USD', r2(delMes.reduce((s, c) => s + c.montoUsd, 0)), 'ZL55B32', 'reportado');
+  pagos.find((x) => x.id === pid)!.destinoIds = delMes.map((c) => c.id);
+}
 pagoDemo('u-A12', hoy(), 'efectivo_usd', 'USD', 80, null, 'reportado');
 
 function reporteDemo(categoria: CategoriaReporte, titulo: string, descripcion: string, ubicacion: string,
@@ -212,6 +224,36 @@ const exigirFinanzas = () => { const s = exigir(); if (!s.manejaFinanzas) throw 
 function puedeVerPartida(p: Partida, s: Sesion) {
   return s.esJunta || (p.estado !== 'borrador' && (!incluidas.has(p.id) || meIncluye(p, s.unidadId)));
 }
+/** Cuánto se ha emitido y cobrado de una cuota especial (igual que avance_partidas). */
+function avanceDe(pid: string): Partida['avance'] {
+  const cs = cargos.filter((c) => c.partidaId === pid && c.montoUsd > 0);
+  if (!cs.length) return null;
+  const casas = [...new Set(cs.map((c) => c.unidadId))];
+  const aps = new Map(casas.map((u) => [u, aplicarUnidad(cargos, pagos, u)]));
+  const pag = (c: Cargo) => aps.get(c.unidadId)!.porCargo.get(c.id) ?? 0;
+  const emitido = r2(cs.reduce((s, c) => s + c.montoUsd, 0)), cobrado = r2(cs.reduce((s, c) => s + pag(c), 0));
+  return {
+    emitidoUsd: emitido, cobradoUsd: cobrado, pendienteUsd: r2(cs.reduce((s, c) => s + Math.max(c.montoUsd - pag(c), 0), 0)),
+    casas: casas.length,
+    casasAlDia: casas.filter((u) => cs.filter((c) => c.unidadId === u).every((c) => pag(c) >= c.montoUsd - 0.005)).length,
+    cuotasEmitidas: new Set(cs.map((c) => c.periodo)).size,
+  };
+}
+
+// ---------- Cierres del mes ----------
+const cierresDemo = new Map<string, { en: string; automatico: boolean; por: string | null; datos: ReporteDelMes['datos'] }>();
+function reporteDe(periodo: string) {
+  const t: TasaBcv = tasaPara(periodo < PERIODO ? mesSiguiente(periodo) : undefined);
+  return armarReporte(periodo, {
+    unidades, cargos, pagos, gastos, cuentas, saldoInicial, partidas,
+    tasa: t.usdVes ? { fecha: t.fecha, usdVes: t.usdVes } : { fecha: null, usdVes: periodo === ANTERIOR ? TASA_EJEMPLO_ANTERIOR : null },
+    etiqueta: (u) => `Apto ${etiqueta(u)}`,
+  });
+}
+
+// El mes anterior ya se cerró solo el día 1 (como lo hace el servidor).
+cierresDemo.set(ANTERIOR, { en: `${PERIODO}T11:30:00.000Z`, automatico: true, por: null, datos: reporteDe(ANTERIOR) });
+
 function vistaPartida(p: Partida): Partida {
   const s = sesion;
   const v = p.votacion;
@@ -223,6 +265,7 @@ function vistaPartida(p: Partida): Partida {
     alcance: { tipo: incluidas.has(p.id) ? 'unidades' : 'todos', nombre: incluidas.has(p.id) ? p.alcance.nombre : null, unidades: casas.length },
     meAfecta: !!u,
     cuotaMiUnidadUsd: u ? cuotaDe(p, u) : null,
+    avance: avanceDe(p.id),
     ...(s?.esJunta ? { unidadIds: [...casas] } : {}),
     votacion: v && {
       ...v,
@@ -297,14 +340,14 @@ const movimientosDemo: (MovimientoBancario & { huella: string })[] = [
 const montoZP = 40;
 type FacturaZPDemo = Pick<FacturaZentaPro, 'id' | 'periodo' | 'plan' | 'montoUsd' | 'tasaBcv' | 'montoVes' | 'vence' | 'estado' | 'numeroControl' | 'pagadaEn'>;
 const facturasZP: FacturaZPDemo[] = [
-  { id: id(), periodo: PERIODO, plan: 'Pequeño', montoUsd: montoZP, tasaBcv: 215.5, montoVes: r2(montoZP * 215.5), vence: PERIODO.slice(0, 8) + '10',
+  { id: id(), periodo: PERIODO, plan: 'Pequeño', montoUsd: montoZP, tasaBcv: TASA_EJEMPLO, montoVes: r2(montoZP * TASA_EJEMPLO), vence: PERIODO.slice(0, 8) + '10',
     estado: 'emitida', numeroControl: null, pagadaEn: null },
-  { id: id(), periodo: ANTERIOR, plan: 'Pequeño', montoUsd: montoZP, tasaBcv: 205.1, montoVes: r2(montoZP * 205.1), vence: ANTERIOR.slice(0, 8) + '10',
+  { id: id(), periodo: ANTERIOR, plan: 'Pequeño', montoUsd: montoZP, tasaBcv: TASA_EJEMPLO_ANTERIOR, montoVes: r2(montoZP * TASA_EJEMPLO_ANTERIOR), vence: ANTERIOR.slice(0, 8) + '10',
     estado: 'pagada', numeroControl: '00-000123', pagadaEn: ANTERIOR.slice(0, 8) + '08T15:00:00.000Z' },
 ];
 interface PagoZPDemo { facturaId: string; referencia: string; montoVes: number; tasa: number; montoUsd: number; estado: 'reportado' | 'confirmado' }
 const pagosZP: PagoZPDemo[] = [
-  { facturaId: facturasZP[1].id, referencia: '00445566', montoVes: r2(montoZP * 205.1), tasa: 205.1, montoUsd: montoZP, estado: 'confirmado' },
+  { facturaId: facturasZP[1].id, referencia: '00445566', montoVes: r2(montoZP * TASA_EJEMPLO_ANTERIOR), tasa: TASA_EJEMPLO_ANTERIOR, montoUsd: montoZP, estado: 'confirmado' },
 ];
 const comentariosDemo = new Map<string, (ComentarioReporte & { autorId: string })[]>();
 
@@ -369,9 +412,11 @@ function avisarPagoReportado(p: Pago, creadoEn?: string) {
 function avisarPagoRevisado(p: Pago) {
   if (p.estado === 'confirmado') {
     const saldo = saldoDe(p.unidadId).saldoUsd;
+    const ap = aplicarUnidad(cargos, pagos, p.unidadId).porPago.get(p.id) ?? [];
     notificar(usuariosDeUnidad(p.unidadId), 'pago_confirmado', 'Pago aprobado',
       `La junta aprobó su pago de ${textoMonto(p)}${conRef(p.referencia)} del ${p.fechaPago.split('-').reverse().join('/')}. `
-        + (saldo > 0.009 ? `Saldo pendiente: $${veF.format(saldo)}.` : 'Está al día.'),
+        + (ap.length ? `Se descontó de: ${ap.map((a) => `${a.concepto} ($${veF.format(a.montoUsd)})`).join(', ')}. ` : '')
+        + (saldo > 0.009 ? `Saldo pendiente: $${veF.format(saldo)}.` : saldo < -0.009 ? `Le quedan $${veF.format(-saldo)} a favor para el próximo recibo.` : 'Está al día.'),
       { pagoId: p.id, pantalla: 'estado-cuenta' });
   } else if (p.estado === 'rechazado') {
     notificar(usuariosDeUnidad(p.unidadId), 'pago_rechazado', 'Pago rechazado',
@@ -592,12 +637,21 @@ export const demoApi: Api = {
   },
   async cuentasDePago() { return cuentas.filter((c) => c.datosPago); },
   async cuentasFinancieras() { return cuentas; },
-  async tasaBcv() { return tasa; },
-  async fijarTasaBcv(usdVes) {
-    exigirFinanzas();
-    if (!(usdVes > 0)) throw new Error('Tasa inválida');
-    tasa.usdVes = usdVes; tasa.fecha = hoy();
+  async tasaBcv(fecha) {
+    await consultarFuentes();
+    const t = tasaPara(fecha);
+    // Igual que con servidor: sin internet es un error de red (la app pide conectarse), no una tasa vieja.
+    if (!t.usdVes && sinInternet()) throw Object.assign(new Error('Sin conexión a internet. Conéctese para actualizar la tasa BCV de hoy.'), { codigo: 'red' });
+    return t;
   },
+  async fijarTasaBcv(usdVes, fecha) {
+    exigirFinanzas();
+    if (!(usdVes > 0) || usdVes > 1e7) throw new Error('Tasa no válida');
+    await consultarFuentes(true);
+    const resultado = confirmarManual(usdVes, fecha);
+    return { resultado, tasa: tasaPara(fecha) };
+  },
+  async lecturasTasa() { exigir(); await consultarFuentes(); return lecturasActuales(); },
   async avisos() { return [...avisos].sort((a, b) => Number(b.fijado) - Number(a.fijado) || b.creadoEn.localeCompare(a.creadoEn)); },
   async crearAviso(a) {
     const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
@@ -614,10 +668,11 @@ export const demoApi: Api = {
     const s = exigir();
     if (!s.esJunta && s.unidadId !== uid) throw new Error('Sin permiso');
     await espera();
+    const ap = aplicarUnidad(cargos, pagos, uid);
     return {
       unidad: unidad(uid),
-      cargos: cargos.filter((c) => c.unidadId === uid).sort((a, b) => b.periodo.localeCompare(a.periodo)),
-      pagos: pagos.filter((p) => p.unidadId === uid).sort((a, b) => b.creadoEn.localeCompare(a.creadoEn)),
+      cargos: cargos.filter((c) => c.unidadId === uid).sort((a, b) => b.periodo.localeCompare(a.periodo)).map((c) => cargoConEstado(c, ap.porCargo)),
+      pagos: pagos.filter((p) => p.unidadId === uid).sort((a, b) => b.creadoEn.localeCompare(a.creadoEn)).map((p) => pagoConDestinos(p, cargos, ap)),
       saldoUsd: saldoDe(uid).saldoUsd,
     };
   },
@@ -626,14 +681,21 @@ export const demoApi: Api = {
     if (!s.manejaFinanzas && s.unidadId !== p.unidadId) throw new Error('Solo puede reportar pagos de su unidad');
     if (p.referencia && pagos.some((x) => x.referencia === p.referencia && x.metodo === p.metodo && x.estado !== 'rechazado'))
       throw new Error('Esa referencia ya fue reportada');
-    const t = p.moneda === 'VES' ? tasa.usdVes : null;
+    let t: number | null = null;
+    if (p.moneda === 'VES') {
+      await consultarFuentes();
+      t = tasaPara(p.fechaPago).usdVes;
+      if (!t) throw new Error(`La tasa BCV del ${p.fechaPago.split('-').reverse().join('/')} todavía no está verificada. Intente de nuevo en unos minutos.`);
+    }
+    const ajenas = (p.cargoIds ?? []).filter((cid) => !cargos.some((c) => c.id === cid && c.unidadId === p.unidadId && c.montoUsd > 0));
+    if (ajenas.length) throw new Error('Alguna de las deudas elegidas no es de esta casa');
     const nuevoId = id();
     pagos.push({
       id: nuevoId, unidadId: p.unidadId, unidadEtiqueta: etiqueta(unidad(p.unidadId)), fechaPago: p.fechaPago, metodo: p.metodo,
       moneda: p.moneda, monto: p.monto, tasaBcv: t, montoUsd: t ? r2(p.monto / t) : p.monto, referencia: p.referencia || null,
       bancoOrigen: p.bancoOrigen || null, comprobanteUrl: p.comprobante ? URL.createObjectURL(p.comprobante) : null,
       nota: p.nota || null, estado: 'reportado', motivoRechazo: null, creadoEn: new Date().toISOString(),
-      cuentaDestinoId: p.cuentaDestinoId ?? null,
+      cuentaDestinoId: p.cuentaDestinoId ?? null, destinoIds: [...new Set(p.cargoIds ?? [])], revisadoEn: null,
     });
     avisarPagoReportado(pagos.find((x) => x.id === nuevoId)!);
     await espera();
@@ -661,15 +723,23 @@ export const demoApi: Api = {
       saldosCuentas: cuentasSaldo,
     };
   },
-  async pagos(filtro) {
+  async pagos(filtro, mes) {
     exigirFinanzas(); await espera();
-    return pagos.filter((p) => filtro === 'todos' || p.estado === filtro).sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+    const fin = mes ? mesSiguiente(mes) : null;
+    const aps = new Map(unidades.map((u) => [u.id, aplicarUnidad(cargos, pagos, u.id)]));
+    return pagos.filter((p) => (filtro === 'todos' || p.estado === filtro) && (!mes || (p.fechaPago >= mes && p.fechaPago < fin!)))
+      .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn)).map((p) => pagoConDestinos(p, cargos, aps.get(p.unidadId)!));
   },
-  async confirmarPago(pid) {
+  async confirmarPago(pid, cargoIds) {
     exigirFinanzas();
     const p = pagos.find((x) => x.id === pid)!;
     if (p.estado !== 'reportado') throw new Error('El pago ya fue revisado');
-    p.estado = 'confirmado';
+    if (cargoIds) {
+      if (cargoIds.some((cid) => !cargos.some((c) => c.id === cid && c.unidadId === p.unidadId && c.montoUsd > 0)))
+        throw new Error('Alguna de las deudas elegidas no es de esta casa');
+      p.destinoIds = [...new Set(cargoIds)];
+    }
+    p.estado = 'confirmado'; p.revisadoEn = new Date().toISOString();
     avisarPagoRevisado(p);
   },
   async rechazarPago(pid, motivo) {
@@ -698,6 +768,25 @@ export const demoApi: Api = {
     return unidades.map((u) => ({ ...u, ...saldoDe(u.id) }));
   },
 
+  // ---- Reporte y cierre del mes (igual que reporte_mensual / cerrar_mes) ----
+  async reporteMensual(periodo) {
+    const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    await espera();
+    const k = cierresDemo.get(periodo);
+    if (k) return { periodo, cerrado: { en: k.en, automatico: k.automatico, por: k.por }, datos: k.datos };
+    return { periodo, cerrado: null, datos: reporteDe(periodo) };
+  },
+  async cerrarMes(periodo) {
+    const s = exigirFinanzas();
+    if (periodo >= PERIODO) throw new Error('Ese mes todavía no ha terminado: se cierra desde el día 1 del mes siguiente');
+    cierresDemo.set(periodo, { en: new Date().toISOString(), automatico: false, por: s.nombre, datos: reporteDe(periodo) });
+  },
+  async cierres() {
+    const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    return [...cierresDemo.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([periodo, k]) => ({ periodo, cerradoEn: k.en, automatico: k.automatico, por: k.por }));
+  },
+
   // ---- Conciliación bancaria (misma regla que conciliar_movimiento() en SQL) ----
   async movimientosBancarios(soloPendientes) {
     exigirFinanzas(); await espera();
@@ -721,7 +810,7 @@ export const demoApi: Api = {
         && refCorta(p.referencia) === refCorta(m.referencia) && diasEntre(p.fechaPago, m.fecha) <= 3);
       if (candidatos.length !== 1) continue;
       const p = candidatos[0];
-      p.estado = 'confirmado'; p.cuentaDestinoId = cuentaId;
+      p.estado = 'confirmado'; p.cuentaDestinoId = cuentaId; p.revisadoEn = new Date().toISOString();
       avisarPagoRevisado(p);
       mov.pagoId = p.id; mov.unidad = etqU(p.unidadId);
       conciliados++;
@@ -734,13 +823,14 @@ export const demoApi: Api = {
     if (!m) throw new Error('Movimiento no existe');
     if (m.pagoId) throw new Error('Ese movimiento ya está conciliado');
     if (m.monto <= 0) throw new Error('Solo se asignan créditos');
-    const t = m.moneda === 'VES' ? tasa.usdVes : null;
+    const t = m.moneda === 'VES' ? tasaPara(m.fecha).usdVes : null;
+    if (m.moneda === 'VES' && !t) throw new Error(`La tasa BCV del ${m.fecha.split('-').reverse().join('/')} todavía no está verificada`);
     const pid = id();
     pagos.push({
       id: pid, unidadId: uid, unidadEtiqueta: etiqueta(unidad(uid)), fechaPago: m.fecha, metodo: m.moneda === 'VES' ? 'pago_movil' : 'zelle',
       moneda: m.moneda, monto: m.monto, tasaBcv: t, montoUsd: t ? r2(m.monto / t) : m.monto, referencia: m.referencia, bancoOrigen: null,
       comprobanteUrl: null, nota: 'Asignado desde movimiento bancario', estado: 'confirmado', motivoRechazo: null,
-      creadoEn: new Date().toISOString(), cuentaDestinoId: m.cuentaId,
+      creadoEn: new Date().toISOString(), cuentaDestinoId: m.cuentaId, revisadoEn: new Date().toISOString(), destinoIds: [],
     });
     m.pagoId = pid; m.unidad = etqU(uid);
     avisarPagoRevisado(pagos.find((x) => x.id === pid)!);
@@ -749,10 +839,12 @@ export const demoApi: Api = {
   // ---- Factura de ZentaPro ----
   async facturasZentaPro() {
     exigirFinanzas();
+    await consultarFuentes();
     return facturasZP.map((f): FacturaZentaPro => {
       const abonadoUsd = r2(pagosZP.filter((p) => p.facturaId === f.id && p.estado === 'confirmado').reduce((s, p) => s + p.montoUsd, 0));
       const saldoUsd = ['pagada', 'anulada'].includes(f.estado) ? 0 : Math.max(0, r2(f.montoUsd - abonadoUsd));
-      return { ...f, abonadoUsd, saldoUsd, tasaHoy: tasa.usdVes, saldoVesHoy: r2(saldoUsd * tasa.usdVes),
+      const hoyT = tasaPara().usdVes;
+      return { ...f, abonadoUsd, saldoUsd, tasaHoy: hoyT, saldoVesHoy: hoyT ? r2(saldoUsd * hoyT) : null,
                pagoPorConfirmar: pagosZP.some((p) => p.facturaId === f.id && p.estado === 'reportado') };
     }).sort((a, b) => b.periodo.localeCompare(a.periodo));
   },
@@ -768,8 +860,11 @@ export const demoApi: Api = {
     if (!['pago_movil', 'transferencia'].includes(p.metodo)) throw new Error('ZentaPro solo recibe pagos en bolívares (Pago Móvil o transferencia)');
     if (!(p.montoVes > 0) || p.referencia.trim().length < 3) throw new Error('Indique el monto en bolívares y la referencia');
     if (p.fechaPago && p.fechaPago > hoy()) throw new Error('La fecha del pago no puede ser futura');
-    pagosZP.push({ facturaId: fid, referencia: p.referencia.trim(), montoVes: p.montoVes, tasa: tasa.usdVes,
-                   montoUsd: r2(p.montoVes / tasa.usdVes), estado: 'reportado' });
+    await consultarFuentes();
+    const tz = tasaPara(p.fechaPago ?? hoy()).usdVes;
+    if (!tz) throw new Error('La tasa BCV de esa fecha todavía no está verificada. Intente de nuevo en unos minutos.');
+    pagosZP.push({ facturaId: fid, referencia: p.referencia.trim(), montoVes: p.montoVes, tasa: tz,
+                   montoUsd: r2(p.montoVes / tz), estado: 'reportado' });
     await espera();
   },
 
@@ -819,6 +914,18 @@ export const demoApi: Api = {
     }
   },
 
+  async cobroPartida(pid) {
+    const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    const aps = new Map(unidades.map((u) => [u.id, aplicarUnidad(cargos, pagos, u.id)]));
+    return unidades.flatMap((u) => {
+      const cs = cargos.filter((c) => c.partidaId === pid && c.unidadId === u.id && c.montoUsd > 0);
+      if (!cs.length) return [];
+      const cargado = r2(cs.reduce((x, c) => x + c.montoUsd, 0));
+      const pagado = r2(cs.reduce((x, c) => x + (aps.get(u.id)!.porCargo.get(c.id) ?? 0), 0));
+      return [{ unidadId: u.id, etiqueta: `Apto ${etiqueta(u)}`, propietario: u.propietario, cargadoUsd: cargado, pagadoUsd: pagado,
+                pendienteUsd: r2(Math.max(cargado - pagado, 0)) }];
+    }).sort((a, b) => b.pendienteUsd - a.pendienteUsd || a.etiqueta.localeCompare(b.etiqueta));
+  },
   async partidas() {
     const s = exigir();
     return partidas.filter((p) => puedeVerPartida(p, s)).map(vistaPartida)

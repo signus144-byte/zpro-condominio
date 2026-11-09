@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, type Moneda } from '../../data';
+import { api, type Cargo, type Moneda, type Pago } from '../../data';
 import { Campo, Cifra, Estado, Etiqueta, Tarjeta, Vacio, useCarga } from '../../components/ui';
-import { ESTADO_PAGO, METODOS, bs, fecha, mes, mesAnterior, mesSiguiente, monto, periodoActual, usd } from '../../formato';
+import { LineaTasa, useTasaDelDia } from '../../components/tasa';
+import { ESTADO_PAGO, METODOS, TIPO_CARGO, bs, fecha, mes, mesAnterior, mesSiguiente, monto, periodoActual, usd } from '../../formato';
 import { BotonSOS } from '../alerta/Alerta';
+import { EtiquetaCargo } from '../residente/Residente';
 
 // ---------------- Panel (columna financiera) ----------------
 export function Panel() {
   const { datos: d, cargando, error, recargar } = useCarga(() => api.panel());
   // Llega un pago nuevo (o se revisa uno): el panel y el recordatorio se actualizan solos.
   useEffect(() => api.suscribirNotificaciones(() => recargar()), [recargar]);
-  const tasa = useCarga(() => api.tasaBcv());
+  const tasa = useTasaDelDia();
   return (
     <Estado cargando={cargando} error={error}>
       {d && (
@@ -25,7 +27,8 @@ export function Panel() {
             </div>
           )}
           <BotonSOS />
-          <p className="subtitulo">{mes(d.periodo)}{tasa.datos && ` · Tasa BCV ${tasa.datos.usdVes.toLocaleString('es-VE')} Bs/$`}</p>
+          <p className="subtitulo">{mes(d.periodo)}</p>
+          <Link to="/p/tasa" className="tasa-enlace"><LineaTasa t={tasa} /></Link>
           <div className="cifras">
             <Cifra etiqueta="Facturado del mes" valor={usd(d.facturadoMesUsd)} />
             <Cifra etiqueta="Cobrado del mes" valor={usd(d.recaudadoMesUsd)}
@@ -43,6 +46,7 @@ export function Panel() {
               <strong>{d.reportesAbiertos}</strong><span>reportes abiertos</span>
             </Link>
           </div>
+          <Link to="/p/cierre" className="btn btn-sec btn-ancho">Reporte y cierre del mes</Link>
 
           <Tarjeta titulo="Saldos por cuenta">
             <table className="tabla">
@@ -62,58 +66,127 @@ export function Panel() {
 // ---------------- Pagos por confirmar ----------------
 export function PagosPresidencia() {
   const [filtro, setFiltro] = useState<'reportado' | 'todos'>('reportado');
-  const { datos, cargando, error, recargar } = useCarga(() => api.pagos(filtro), [filtro]);
+  const [periodo, setPeriodo] = useState(periodoActual());
+  const { datos, cargando, error, recargar } = useCarga(() => api.pagos(filtro, filtro === 'todos' ? periodo : undefined), [filtro, periodo]);
   useEffect(() => api.suscribirNotificaciones((n) => { if (n.tipo === 'pago_reportado') recargar(); }), [recargar]);
-  const [rechazando, setRechazando] = useState<string | null>(null);
-  const [motivo, setMotivo] = useState('');
-  const [errAccion, setErrAccion] = useState<string | null>(null);
-
-  async function accion(fn: () => Promise<void>) {
-    setErrAccion(null);
-    try { await fn(); setRechazando(null); setMotivo(''); recargar(); } catch (e) { setErrAccion((e as Error).message); }
-  }
 
   return (
     <>
       <div className="chips">
         <button className={`chip ${filtro === 'reportado' ? 'chip-activo' : ''}`} onClick={() => setFiltro('reportado')}>Por revisar</button>
-        <button className={`chip ${filtro === 'todos' ? 'chip-activo' : ''}`} onClick={() => setFiltro('todos')}>Todos</button>
+        <button className={`chip ${filtro === 'todos' ? 'chip-activo' : ''}`} onClick={() => setFiltro('todos')}>Por mes</button>
       </div>
-      {errAccion && <div className="aviso aviso-error">{errAccion}</div>}
+      {filtro === 'todos' && (
+        <div className="selector-mes">
+          <button className="btn-texto" onClick={() => setPeriodo(mesAnterior(periodo))} aria-label="Mes anterior">‹</button>
+          <strong>{mes(periodo)}</strong>
+          <button className="btn-texto" onClick={() => setPeriodo(mesSiguiente(periodo))} aria-label="Mes siguiente" disabled={periodo >= periodoActual()}>›</button>
+        </div>
+      )}
       <Estado cargando={cargando} error={error}>
-        {datos?.length ? datos.map((p) => (
-          <Tarjeta key={p.id} className="pago">
-            <div className="reporte-cab">
-              <strong>Apto {p.unidadEtiqueta}</strong>
-              <Etiqueta tono={p.estado === 'confirmado' ? 'ok' : p.estado === 'rechazado' ? 'error' : 'info'}>{ESTADO_PAGO[p.estado]}</Etiqueta>
-            </div>
-            <div className="pago-monto">
-              {p.moneda === 'USD' ? usd(p.monto) : bs(p.monto)}
-              {p.moneda === 'VES' && <small> = {usd(p.montoUsd)} · tasa {p.tasaBcv}</small>}
-            </div>
-            <small className="meta">
-              {METODOS[p.metodo]} · {fecha(p.fechaPago)}{p.referencia && <> · Ref. <strong>{p.referencia}</strong></>}{p.bancoOrigen && ` · ${p.bancoOrigen}`}
-            </small>
-            {p.comprobanteUrl && <a className="btn-texto" href={p.comprobanteUrl} target="_blank" rel="noreferrer">Ver comprobante</a>}
-            {p.motivoRechazo && <small className="txt-error">Rechazado: {p.motivoRechazo}</small>}
-            {p.estado === 'reportado' && (rechazando === p.id ? (
-              <div className="formulario">
-                <Campo etiqueta="Motivo del rechazo" ayuda="La casa recibirá este motivo en su notificación"><input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej.: la referencia no aparece en el banco" autoFocus /></Campo>
-                <div className="fila-botones">
-                  <button className="btn btn-peligro" disabled={motivo.trim().length < 3} onClick={() => accion(() => api.rechazarPago(p.id, motivo.trim()))}>Rechazar pago</button>
-                  <button className="btn-texto" onClick={() => setRechazando(null)}>Cancelar</button>
-                </div>
-              </div>
-            ) : (
-              <div className="fila-botones">
-                <button className="btn" onClick={() => accion(() => api.confirmarPago(p.id))}>Aprobar (ya está en el banco)</button>
-                <button className="btn btn-sec" onClick={() => setRechazando(p.id)}>Rechazar</button>
-              </div>
-            ))}
-          </Tarjeta>
-        )) : <Vacio>{filtro === 'reportado' ? 'No hay pagos por revisar. 🎉' : 'Sin pagos.'}</Vacio>}
+        {datos?.length ? datos.map((p) => <TarjetaPago key={p.id} p={p} alCambiar={recargar} />)
+          : <Vacio>{filtro === 'reportado' ? 'No hay pagos por revisar. 🎉' : `Sin pagos en ${mes(periodo).toLowerCase()}.`}</Vacio>}
       </Estado>
     </>
+  );
+}
+
+function TarjetaPago({ p, alCambiar }: { p: Pago; alCambiar: () => void }) {
+  const [modo, setModo] = useState<'nada' | 'rechazar' | 'asignar'>('nada');
+  const [motivo, setMotivo] = useState('');
+  const [deudas, setDeudas] = useState<Cargo[] | null>(null);
+  const [sel, setSel] = useState<string[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const destinos = p.destinos ?? [];
+  const cubre = destinos.reduce((s, d) => s + d.montoUsd, 0);
+
+  async function accion(fn: () => Promise<void>) {
+    setErr(null); setOcupado(true);
+    try { await fn(); setModo('nada'); alCambiar(); } catch (e) { setErr((e as Error).message); } finally { setOcupado(false); }
+  }
+  async function abrirAsignar() {
+    setErr(null);
+    try {
+      const e = await api.estadoCuenta(p.unidadId);
+      const pend = e.cargos.filter((c) => (c.pendienteUsd ?? 0) > 0.009).sort((a, b) => a.periodo.localeCompare(b.periodo));
+      setDeudas(pend); setSel(destinos.map((d) => d.cargoId).filter((id) => pend.some((c) => c.id === id))); setModo('asignar');
+    } catch (e) { setErr((e as Error).message); }
+  }
+  const totalSel = (deudas ?? []).filter((c) => sel.includes(c.id)).reduce((s, c) => s + (c.pendienteUsd ?? 0), 0);
+
+  return (
+    <Tarjeta className="pago">
+      <div className="reporte-cab">
+        <strong>Apto {p.unidadEtiqueta}</strong>
+        <Etiqueta tono={p.estado === 'confirmado' ? 'ok' : p.estado === 'rechazado' ? 'error' : 'info'}>{ESTADO_PAGO[p.estado]}</Etiqueta>
+      </div>
+      <div className="pago-monto">
+        {p.moneda === 'USD' ? usd(p.monto) : bs(p.monto)}
+        {p.moneda === 'VES' && <small> = {usd(p.montoUsd)} · tasa {p.tasaBcv}</small>}
+      </div>
+      <small className="meta">
+        {METODOS[p.metodo]} · {fecha(p.fechaPago)}{p.referencia && <> · Ref. <strong>{p.referencia}</strong></>}{p.bancoOrigen && ` · ${p.bancoOrigen}`}
+      </small>
+      {p.estado === 'reportado' && (
+        <div className="destino-pago">
+          {destinos.length ? (
+            <>
+              <span>El vecino lo destinó a:</span>
+              <ul>{destinos.map((d) => <li key={d.cargoId}>{d.concepto} <small>falta {usd(d.montoUsd)}</small></li>)}</ul>
+              {p.montoUsd > cubre + 0.009 && <small>Sobran {usd(p.montoUsd - cubre)}: irán a su deuda más antigua o quedarán a favor.</small>}
+              {p.montoUsd < cubre - 0.009 && <small>Es un abono: cubre {usd(p.montoUsd)} de {usd(cubre)}.</small>}
+            </>
+          ) : <span>No indicó qué paga: se descontará de su deuda más antigua.</span>}
+        </div>
+      )}
+      {p.estado === 'confirmado' && !!p.aplicaciones?.length && (
+        <small className="aplicado">Se descontó de: {p.aplicaciones.map((a) => `${a.concepto} (${usd(a.montoUsd)})`).join(', ')}</small>
+      )}
+      {p.comprobanteUrl && <a className="btn-texto" href={p.comprobanteUrl} target="_blank" rel="noreferrer">Ver comprobante</a>}
+      {p.motivoRechazo && <small className="txt-error">Rechazado: {p.motivoRechazo}</small>}
+      {err && <div className="aviso aviso-error">{err}</div>}
+      {p.estado === 'reportado' && modo === 'rechazar' && (
+        <div className="formulario">
+          <Campo etiqueta="Motivo del rechazo" ayuda="La casa recibirá este motivo en su notificación"><input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej.: la referencia no aparece en el banco" autoFocus /></Campo>
+          <div className="fila-botones">
+            <button className="btn btn-peligro" disabled={motivo.trim().length < 3 || ocupado} onClick={() => accion(() => api.rechazarPago(p.id, motivo.trim()))}>Rechazar pago</button>
+            <button className="btn-texto" onClick={() => setModo('nada')}>Cancelar</button>
+          </div>
+        </div>
+      )}
+      {p.estado === 'reportado' && modo === 'asignar' && deudas && (
+        <div className="formulario">
+          <strong>¿A qué se aplica este pago?</strong>
+          {deudas.length ? (
+            <ul className="lista deudas">
+              {deudas.map((c) => (
+                <li key={c.id} className={`elegible ${sel.includes(c.id) ? 'elegido' : ''}`}>
+                  <label className="check-deuda">
+                    <input type="checkbox" checked={sel.includes(c.id)}
+                           onChange={() => setSel(sel.includes(c.id) ? sel.filter((x) => x !== c.id) : [...sel, c.id])} />
+                    <span><strong>{c.concepto}</strong><small>{mes(c.periodo)} · {TIPO_CARGO[c.tipo]} <EtiquetaCargo c={c} /></small></span>
+                  </label>
+                  <strong className="num">{usd(c.pendienteUsd ?? 0)}</strong>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="nota">Esta casa no tiene deudas pendientes: el pago quedará a favor.</p>}
+          <small className="nota">Elegido: {usd(totalSel)} · el pago equivale a {usd(p.montoUsd)}. Lo que sobre va a la deuda más antigua.</small>
+          <div className="fila-botones">
+            <button className="btn" disabled={ocupado} onClick={() => accion(() => api.confirmarPago(p.id, sel))}>Aprobar con esta asignación</button>
+            <button className="btn-texto" onClick={() => setModo('nada')}>Cancelar</button>
+          </div>
+        </div>
+      )}
+      {p.estado === 'reportado' && modo === 'nada' && (
+        <div className="fila-botones">
+          <button className="btn" disabled={ocupado} onClick={() => accion(() => api.confirmarPago(p.id))}>Aprobar (ya está en el banco)</button>
+          <button className="btn btn-sec" onClick={() => setModo('rechazar')}>Rechazar</button>
+          <button className="btn-texto" onClick={() => void abrirAsignar()}>Cambiar a qué se aplica</button>
+        </div>
+      )}
+    </Tarjeta>
   );
 }
 
@@ -121,7 +194,7 @@ export function PagosPresidencia() {
 export function Gastos() {
   const [periodo, setPeriodo] = useState(periodoActual());
   const { datos, cargando, error, recargar } = useCarga(() => api.gastos(periodo), [periodo]);
-  const tasa = useCarga(() => api.tasaBcv());
+  const tasa = useCarga(() => api.tasaBcv().catch(() => null));
   const [nuevo, setNuevo] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const total = (datos ?? []).reduce((s, g) => s + g.montoUsd, 0);
@@ -158,7 +231,7 @@ export function Gastos() {
         </Estado>
         <p className="nota">Esta relación la ven todos los residentes (transparencia).</p>
       </Tarjeta>
-      {nuevo ? <FormGasto periodo={periodo} tasaSugerida={tasa.datos?.usdVes} alTerminar={() => { setNuevo(false); recargar(); }} />
+      {nuevo ? <FormGasto periodo={periodo} tasaSugerida={tasa.datos?.usdVes ?? undefined} alTerminar={() => { setNuevo(false); recargar(); }} />
              : <button className="btn btn-sec btn-ancho" onClick={() => setNuevo(true)}>+ Registrar gasto</button>}
       <Tarjeta titulo="Recibos del mes">
         <p>Reparte los gastos comunes de {mes(periodo)} por alícuota, agrega el fondo de reserva, las cuotas de partidas especiales aprobadas y los gastos no comunes de cada apartamento.</p>
@@ -263,7 +336,7 @@ function DetalleUnidad({ id }: { id: string }) {
         <Tarjeta titulo={`Estado de cuenta ${e.unidad.bloque}-${e.unidad.numero}`} accion={<strong>{usd(e.saldoUsd)}</strong>}>
           <table className="tabla">
             <tbody>
-              {e.cargos.map((c) => <tr key={c.id}><td>{c.concepto}<small>{mes(c.periodo)}</small></td><td className="num">{usd(c.montoUsd)}</td></tr>)}
+              {e.cargos.map((c) => <tr key={c.id}><td>{c.concepto}<small>{mes(c.periodo)} <EtiquetaCargo c={c} /></small></td><td className="num">{usd(c.montoUsd)}{c.estado === 'parcial' && <small>falta {usd(c.pendienteUsd ?? 0)}</small>}</td></tr>)}
               {e.pagos.filter((p) => p.estado === 'confirmado').map((p) => (
                 <tr key={p.id}><td>Pago {METODOS[p.metodo]}<small>{fecha(p.fechaPago)}</small></td><td className="num txt-ok">−{usd(p.montoUsd)}</td></tr>
               ))}

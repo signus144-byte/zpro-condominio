@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, type CodigoAcceso, type Rol } from '../../data';
 import { Campo, Cifra, Estado, Etiqueta, Tarjeta, Vacio, useCarga } from '../../components/ui';
-import { bs, fecha, hoyLocal, mes, usd, METODOS } from '../../formato';
+import { bs, fecha, hace, hoyLocal, mes, usd, METODOS } from '../../formato';
+import { BloqueoTasa, LineaTasa, useTasaDelDia } from '../../components/tasa';
 import { adivinarColumnas, aMovimientos, leerArchivo, type Columnas, type TablaCruda } from '../../conciliacion/leerExtracto';
 import './admin.css';
 
@@ -519,31 +520,67 @@ export function AdminAvisos() {
 // ============================ Tasa BCV ============================
 export function TasaBcv() {
   const s = api.sesion()!;
-  const tasa = useCarga(() => api.tasaBcv());
+  const tasa = useTasaDelDia();
+  const lecturas = useCarga(() => api.lecturasTasa());
   const [valor, setValor] = useState('');
-  const a = useAccion(tasa.recargar);
+  const [fechaValor, setFechaValor] = useState(hoyLocal());
+  const [res, setRes] = useState<{ ok: boolean; t: string } | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const recargarTodo = () => { tasa.recargar(); lecturas.recargar(); };
+
+  async function confirmar(e: React.FormEvent) {
+    e.preventDefault();
+    setRes(null);
+    const n = Number(valor.replace(/\./g, '').replace(',', '.'));
+    if (!(n > 0)) return setRes({ ok: false, t: 'Escriba la tasa tal como aparece en bcv.org.ve, p. ej. 897,5383' });
+    setOcupado(true);
+    try {
+      const r = await api.fijarTasaBcv(n, fechaValor);
+      setRes(r.resultado === 'verificada'
+        ? { ok: true, t: `Tasa confirmada con dos fuentes (${r.tasa.fuentes.join(' y ')}). Los vecinos ya pueden pagar en bolívares.` }
+        : r.resultado === 'no_coinciden'
+          ? { ok: false, t: 'Su número no coincide con el de las otras fuentes. Revise bcv.org.ve: no se acepta ninguna tasa hasta que coincidan.' }
+          : { ok: false, t: 'Quedó registrada como UNA fuente. Hace falta que otra fuente (BCV, DolarApi o Technical Digital TD) dé el mismo valor.' });
+      setValor('');
+      recargarTodo();
+    } catch (err) { setRes({ ok: false, t: (err as Error).message }); } finally { setOcupado(false); }
+  }
+
   return (
     <>
-      <Estado cargando={tasa.cargando} error={tasa.error}>
-        <div className="cifras">
-          <Cifra etiqueta="Tasa BCV vigente" valor={tasa.datos ? `${tasa.datos.usdVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$` : 'Sin cargar'}
-                 nota={tasa.datos ? `del ${fecha(tasa.datos.fecha)}` : undefined} />
-        </div>
-      </Estado>
-      <Tarjeta titulo="Cargar la tasa a mano">
-        <p className="nota">El servidor toma la tasa oficial del BCV dos veces al día. Úselo solo si la página del BCV no respondió.</p>
+      <Tarjeta titulo="Tasa BCV de hoy" accion={<button className="btn-texto" onClick={recargarTodo}>Actualizar</button>}>
+        {tasa.usdVes ? <LineaTasa t={tasa} /> : <BloqueoTasa t={tasa} accion="recibir pagos en bolívares" />}
+        <p className="nota">El servidor consulta cada 30 minutos la página del BCV y DolarApi. La tasa solo se acepta cuando
+          <strong> dos fuentes dan el mismo número</strong>. Sin eso, los vecinos no pueden reportar pagos en bolívares, para que nadie pague un monto equivocado.</p>
+      </Tarjeta>
+      <Tarjeta titulo="Qué dijo cada fuente (últimas 24 h)">
+        <Estado cargando={lecturas.cargando} error={lecturas.error}>
+          {lecturas.datos?.length ? (
+            <table className="tabla">
+              <tbody>
+                {lecturas.datos.map((l) => (
+                  <tr key={l.fuente + l.leidaEn}>
+                    <td><strong>{l.fuente}</strong><small>{hace(l.leidaEn)}{l.fechaValor ? ` · fecha valor ${fecha(l.fechaValor)}` : ''}</small></td>
+                    <td className="num">{l.usdVes != null ? l.usdVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : <span className="txt-error">No respondió</span>}
+                      {l.error && <small className="txt-error">{l.error}</small>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <Vacio>Todavía no hay consultas registradas.</Vacio>}
+        </Estado>
+      </Tarjeta>
+      <Tarjeta titulo="Confirmar la tasa (segunda fuente)">
+        <p className="nota">Si una fuente no responde, la junta puede servir de segunda fuente: abra <strong>bcv.org.ve</strong> y copie el número y la fecha valor.
+          Todas las personas de la junta cuentan como <strong>una sola</strong> fuente.</p>
         {s.manejaFinanzas ? (
-          <form className="formulario" onSubmit={(e) => {
-            e.preventDefault();
-            const n = Number(valor.replace(/\./g, '').replace(',', '.'));
-            void a.hacer(async () => { if (!(n > 0)) throw new Error('Escriba una tasa válida, p. ej. 215,50'); await api.fijarTasaBcv(n); setValor(''); }, 'Tasa guardada.');
-          }}>
-            <Campo etiqueta="Bolívares por dólar (BCV de hoy)"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="215,50" required /></Campo>
-            <button className="btn" disabled={a.ocupado}>Guardar tasa</button>
+          <form className="formulario" onSubmit={confirmar}>
+            <Campo etiqueta="Bolívares por dólar (como aparece en el BCV)"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="897,5383" required /></Campo>
+            <Campo etiqueta="Fecha valor"><input type="date" value={fechaValor} onChange={(e) => setFechaValor(e.target.value)} /></Campo>
+            <button className="btn" disabled={ocupado}>{ocupado ? 'Comprobando…' : 'Confirmar tasa'}</button>
           </form>
-        ) : <p className="nota">Solo presidencia, tesorería o la administración pueden cargarla.</p>}
-        {a.ok && <div className="aviso aviso-ok">{a.ok}</div>}
-        {a.error && <div className="aviso aviso-error">{a.error}</div>}
+        ) : <p className="nota">Solo presidencia, tesorería o la administración pueden confirmarla.</p>}
+        {res && <div className={`aviso ${res.ok ? 'aviso-ok' : 'aviso-error'}`}>{res.t}</div>}
       </Tarjeta>
     </>
   );

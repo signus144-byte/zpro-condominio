@@ -1,7 +1,8 @@
 // Descarga de documentos con la marca del condominio (PDF y Excel).
 // Las plantillas (src/documentos) se cargan solo al usarlas, para no engordar el arranque de la app.
 import { useState } from 'react';
-import { api, type Marca, type TipoDocumento, type UnidadConSaldo } from '../data';
+import { Link } from 'react-router-dom';
+import { api, type Marca, type ReporteDelMes, type TipoDocumento, type UnidadConSaldo } from '../data';
 import { Campo, Estado, Etiqueta, Tarjeta, Vacio, useCarga } from '../components/ui';
 import { mes, mesAnterior, mesSiguiente, periodoActual, usd } from '../formato';
 import '../documentos/documentos.css';
@@ -32,7 +33,7 @@ async function registrar(tipo: TipoDocumento, formato: 'pdf' | 'xlsx', extra: { 
 async function tasa() { try { return (await api.tasaBcv())?.usdVes ?? null; } catch { return null; } }
 
 /** Botón que genera y descarga un documento, con su propio estado de "generando…". */
-function BotonDoc({ texto, formato, hacer, deshabilitado }: {
+export function BotonDoc({ texto, formato, hacer, deshabilitado }: {
   texto: string; formato: 'PDF' | 'Excel'; hacer: () => Promise<string | null | void>; deshabilitado?: boolean;
 }) {
   const [estado, setEstado] = useState<{ ocupado: boolean; msg: string | null; error: boolean }>({ ocupado: false, msg: null, error: false });
@@ -52,6 +53,19 @@ function BotonDoc({ texto, formato, hacer, deshabilitado }: {
       {estado.msg && <small className={estado.error ? 'txt-error' : 'doc-ok'}>{estado.msg}</small>}
     </div>
   );
+}
+
+/** Reporte del mes (PDF o Excel) o solo el libro de ingresos y egresos, con código de verificación. */
+export async function documentoReporte(rep: ReporteDelMes, cual: 'pdf' | 'xlsx' | 'libro') {
+  const p = await cargarPlantillas();
+  const marca = await marcaDoc(p);
+  const formato = cual === 'pdf' ? 'pdf' : 'xlsx';
+  const { codigo, aviso } = await registrar(cual === 'libro' ? 'libro_ingresos_egresos' : 'reporte_mensual', formato, { periodo: rep.periodo });
+  const mesTxt = rep.periodo.slice(0, 7);
+  const bytes = cual === 'pdf' ? await p.reporteMensualPdf(marca, rep, { codigo })
+    : cual === 'xlsx' ? await p.reporteMensualXlsx(marca, rep, { codigo }) : await p.libroIngresosEgresosXlsx(marca, rep, { codigo });
+  await p.descargar(bytes, `${cual === 'libro' ? 'Libro de ingresos y egresos' : 'Reporte del mes'} ${mesTxt}.${formato}`, p.MIME[formato]);
+  return aviso;
 }
 
 // =====================================================================
@@ -199,6 +213,16 @@ export function DocumentosPresidencia() {
           <BotonDoc texto="Relación de gastos" formato="Excel" hacer={() => gastos('xlsx')} />
         </div>
         <p className="nota">Para publicar en la cartelera o enviar al grupo de vecinos.</p>
+      </Tarjeta>
+
+      <Tarjeta titulo="Reporte del mes y libro de ingresos y egresos">
+        <p className="nota">Quién pagó y quién no, pagos aprobados y rechazados, gastos, saldos de las cuentas y cuotas especiales de {mes(periodo).toLowerCase()}.</p>
+        <div className="doc-fila">
+          <BotonDoc texto="Reporte del mes" formato="PDF" hacer={async () => documentoReporte(await api.reporteMensual(periodo), 'pdf')} />
+          <BotonDoc texto="Reporte del mes" formato="Excel" hacer={async () => documentoReporte(await api.reporteMensual(periodo), 'xlsx')} />
+          <BotonDoc texto="Libro de ingresos y egresos" formato="Excel" hacer={async () => documentoReporte(await api.reporteMensual(periodo), 'libro')} />
+        </div>
+        <Link className="btn-texto" to={`/p/cierre?periodo=${periodo}`}>Ver en pantalla y cerrar el mes</Link>
       </Tarjeta>
 
       <Tarjeta titulo="Morosidad">

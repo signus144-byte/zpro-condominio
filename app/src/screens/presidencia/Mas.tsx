@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import '../chat/chat.css';
 
 const OPCIONES = [
+  { a: '/p/cierre', t: 'Reporte y cierre del mes', d: 'Quién pagó y quién no, ingresos, gastos y saldos; PDF y Excel mes a mes' },
   { a: '/p/mensajes', t: 'Mensajes masivos', d: 'Avisar a todo el condominio, a una calle, a un piso o a casas elegidas' },
   { a: '/p/grupos', t: 'Grupos de casas', d: 'Calles con portón, pisos con llave, torres: para cuotas y mensajes' },
   { a: '/p/invitar', t: 'Invitar vecinos', d: 'Enlace y código QR para que cada vecino pida entrar con Vecinos ZPro' },
@@ -17,8 +18,8 @@ const OPCIONES = [
   { a: '/p/salas/nueva', t: 'Nueva sala o canal', d: 'Grupos por bloque o comisión, canal de avisos' },
   { a: '/p/documentos', t: 'Documentos', d: 'Estados de cuenta, solvencias, actas para firma y sello (PDF y Excel)' },
   { a: '/p/marca', t: 'Marca del condominio', d: 'Nombre de la asociación, logo y foto de la entrada' },
-  { a: '/p/tasa', t: 'Tasa BCV', d: 'Ver la tasa vigente o cargarla a mano' },
-  { a: '/p/zentapro', t: 'Mensualidad de ZentaPro', d: 'Factura del servicio y reportar su pago' },
+  { a: '/p/tasa', t: 'Tasa BCV', d: 'Tasa del día comprobada con dos fuentes; confirmarla si una no responde' },
+  { a: '/p/zentapro', t: 'Mensualidad del servicio', d: 'Factura de Technical Digital TD y reportar su pago' },
   { a: '/cuenta', t: 'Mi cuenta', d: 'Mis datos, cambiar clave, cambiar de condominio, salir' },
 ];
 
