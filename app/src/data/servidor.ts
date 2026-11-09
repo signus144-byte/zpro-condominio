@@ -11,6 +11,7 @@ import type {
   AlertaVecinal, CercaniaUnidad, ConfigAlerta, EnlaceInvitacion, InfoInvitacion, ParticipanteAlerta,
   Difusion, GrupoUnidades, PreviaDifusion, UnidadAlcance,
   CierreMes, CobroPartidaCasa, LecturaTasa, ReporteDelMes, ResultadoConfirmarTasa, TasaBcv,
+  ConfigConvivencia, DenunciaAnonima, MensajeAnonimo, MorosoPublico,
 } from './tipos';
 
 const JUNTA: Rol[] = ['presidente', 'tesorero', 'vocal', 'administrador'];
@@ -406,9 +407,23 @@ export function crearApiServidor(base: string): Api {
     async crearReporte(r) {
       await pedir('POST', c('/reportes'), formulario({
         categoria: r.categoria, titulo: r.titulo, descripcion: r.descripcion, ubicacion: r.ubicacion,
-        anonimo: r.anonimo, visibilidad: r.visibilidad,
+        anonimo: r.anonimo, visibilidad: r.visibilidad, unidadId: r.unidadId,
       }, { fotos: r.fotos }));
     },
+
+    // ---- Transparencia y convivencia (v0.8) ----
+    convivencia: () => pedir<ConfigConvivencia>('GET', c('/convivencia')),
+    async fijarConvivencia(k) { await pedir('PUT', c('/convivencia'), { ...k }); },
+    morosos: (vistaPrevia) => pedir<MorosoPublico[]>('GET', c(`/morosos${vistaPrevia ? '?vistaPrevia=1' : ''}`)),
+    mensajesAnonimos: () => pedir<MensajeAnonimo[]>('GET', c('/anonimos')),
+    enviarMensajeAnonimo: (m) => pedir<{ id: string; reporteId: string | null }>('POST', c('/anonimos'), formulario({
+      unidadId: m.unidadId, categoria: m.categoria, texto: m.texto, tambienJunta: m.tambienJunta, titulo: m.titulo,
+    }, { fotos: m.fotos })),
+    async marcarAnonimoLeido(id) { await pedir('POST', c(`/anonimos/${id}/leido`), {}); },
+    async responderAnonimo(id, texto) { await pedir('POST', c(`/anonimos/${id}/responder`), { texto }); },
+    async denunciarAnonimo(id, motivo) { await pedir('POST', c(`/anonimos/${id}/denunciar`), { motivo }); },
+    denunciasAnonimas: () => pedir<DenunciaAnonima[]>('GET', c('/anonimos/denuncias')),
+    async revisarDenuncia(id, accion, dias) { await pedir('POST', c(`/anonimos/${id}/revisar`), { accion, ...(dias ? { dias } : {}) }); },
     async cambiarEstadoReporte(id, estado, respuesta) { await pedir('PATCH', c(`/reportes/${id}`), { estado, respuesta }); },
     comentariosReporte: (id) => pedir<ComentarioReporte[]>('GET', c(`/reportes/${id}/comentarios`)),
     async comentarReporte(id, texto) { await pedir('POST', c(`/reportes/${id}/comentarios`), { texto }); },

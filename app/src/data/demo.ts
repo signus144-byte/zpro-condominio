@@ -14,7 +14,7 @@ import { crearChatDemo, etiquetaChat } from './demoChat';
 import { crearAlertaDemo } from './demoAlerta';
 import { aplicarUnidad, cargoConEstado, pagoConDestinos, reporteMensual as armarReporte, type PagoDemo } from './demoFinanzas';
 import { confirmarManual, consultarFuentes, lecturasActuales, sinInternet, tasaPara } from './tasaEnVivo';
-import type { ReporteDelMes, TasaBcv } from './tipos';
+import type { ConfigConvivencia, DenunciaAnonima, MensajeAnonimo, MorosoPublico, ReporteDelMes, TasaBcv } from './tipos';
 
 let n = 0;
 const id = () => `demo-${++n}`;
@@ -247,7 +247,7 @@ function reporteDe(periodo: string) {
   return armarReporte(periodo, {
     unidades, cargos, pagos, gastos, cuentas, saldoInicial, partidas,
     tasa: t.usdVes ? { fecha: t.fecha, usdVes: t.usdVes } : { fecha: null, usdVes: periodo === ANTERIOR ? TASA_EJEMPLO_ANTERIOR : null },
-    etiqueta: (u) => `Apto ${etiqueta(u)}`,
+    etiqueta: (u) => etiquetaChat(u),
   });
 }
 
@@ -425,7 +425,49 @@ function avisarPagoRevisado(p: Pago) {
       { pagoId: p.id, pantalla: 'estado-cuenta' });
   }
 }
+// ---------- Transparencia y convivencia (0025_convivencia.sql) ----------
+const convivencia: ConfigConvivencia = { morososPublicos: 'no', morososMesesMin: 1, mensajesAnonimos: true };
+interface AnonimoDemo extends Omit<MensajeAnonimo, 'direccion' | 'aUnidad'> {
+  aUnidadId: string; autorId: string;              // autorId: solo para límites y suspensiones; NUNCA sale de aquí
+  motivo: string | null;
+}
+const anonimos: AnonimoDemo[] = [];
+const bloqueosAnon: { autorId: string; hasta: number }[] = [];
+const hace = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
+anonimos.push(
+  { id: id(), aUnidadId: 'u-B33', autorId: 'usr-ana', categoria: 'estacionamiento', fotos: [], tambienJunta: false,
+    texto: 'Buenas tardes. Su carro gris lleva tres días en el puesto de visitantes y las visitas no tienen dónde estacionar. ¿Podría moverlo, por favor?',
+    leidoEn: null, denunciadoEn: null, revision: null, creadoEn: hace(20), respuestas: [], motivo: null },
+  { id: id(), aUnidadId: 'u-B34', autorId: 'usr-elena', categoria: 'mascotas', fotos: [], tambienJunta: true,
+    texto: 'Cada vez que bajan al perrito hace sus necesidades frente a la entrada del edificio. Les agradecería recogerlo.',
+    leidoEn: hace(30), denunciadoEn: null, revision: null, creadoEn: hace(48),
+    respuestas: [{ id: id(), de: 'casa', texto: 'Disculpe, no sabíamos. Ya hablamos con quien lo pasea; no volverá a pasar.', creadoEn: hace(30) }], motivo: null },
+  { id: id(), aUnidadId: 'u-A13', autorId: 'usr-otro', categoria: 'ruido', fotos: [], tambienJunta: false,
+    texto: 'Ustedes son unos desconsiderados, todas las noches con la música a todo volumen. ¡Ya basta!',
+    leidoEn: hace(5), denunciadoEn: hace(4), revision: null, creadoEn: hace(6), respuestas: [], motivo: 'Es falso: no tenemos equipo de sonido, y el tono es ofensivo.' },
+);
+const vistaAnonimo = (a: AnonimoDemo, uid: string | null): MensajeAnonimo => {
+  const { aUnidadId, autorId: _a, motivo: _m, ...x } = a;
+  return { ...x, direccion: aUnidadId === uid ? 'recibido' : 'enviado', aUnidad: etiquetaChat(unidad(aUnidadId)) };
+};
+/** Casas con cuotas vencidas (igual que morosos_publicos): recibos cuya fecha de vencimiento ya pasó y no están pagados. */
+function morososDe(): MorosoPublico[] {
+  const hoyT = hoy();
+  return unidades.flatMap((u) => {
+    const ap = aplicarUnidad(cargos, pagos, u.id);
+    const venc = cargos.filter((c) => c.unidadId === u.id && c.montoUsd > 0)
+      .map((c) => ({ c, falta: r2(Math.max(c.montoUsd - (ap.porCargo.get(c.id) ?? 0), 0)) }))
+      .filter(({ c, falta }) => falta > 0.009 && `${c.periodo.slice(0, 8)}${String(condominio.diaVencimiento).padStart(2, '0')}` < hoyT);
+    const meses = new Set(venc.map((v) => v.c.periodo)).size;
+    if (!meses || meses < convivencia.morososMesesMin) return [];
+    return [{ unidadId: u.id, etiqueta: etiquetaChat(u), mesesVencidos: meses, montoVencidoUsd: r2(venc.reduce((s2, v) => s2 + v.falta, 0)),
+              desde: venc.map((v) => v.c.periodo).sort()[0] }];
+  }).sort((a, b) => b.mesesVencidos - a.mesesVencidos || (b.montoVencidoUsd ?? 0) - (a.montoVencidoUsd ?? 0));
+}
+
 // Semilla: los dos pagos reportados avisaron a la junta, y esta mañana llegó el recordatorio diario.
+notificar(['usr-elena'], 'mensaje_anonimo', 'Mensaje anónimo de un vecino', 'Un vecino le dejó un mensaje sin su nombre. Puede leerlo y responder sin saber quién es.', { pantalla: 'anonimos', mensajeId: anonimos[0].id }, hace(20));
+notificar(['usr-maria', 'usr-jorge'], 'denuncia_anonima', 'Mensaje anónimo denunciado', 'Casa 13 denunció un mensaje anónimo que recibió. Revíselo: puede suspender al remitente sin saber quién es.', { pantalla: 'denuncias', mensajeId: anonimos[2].id }, hace(4));
 for (const p of pagos.filter((x) => x.estado === 'reportado')) avisarPagoReportado(p, new Date(Date.now() - 5 * 3600_000).toISOString());
 {
   const pend = pagos.filter((x) => x.estado === 'reportado');
@@ -624,7 +666,7 @@ export const demoApi: Api = {
     return CONDO;
   },
 
-  async condominio() { return { ...condominio }; },
+  async condominio() { return { ...condominio, ...convivencia }; },
   async fijarChatVecinos(activo) {
     exigirPresidencia();
     if (condominio.chatVecinos === activo) return;
@@ -922,7 +964,7 @@ export const demoApi: Api = {
       if (!cs.length) return [];
       const cargado = r2(cs.reduce((x, c) => x + c.montoUsd, 0));
       const pagado = r2(cs.reduce((x, c) => x + (aps.get(u.id)!.porCargo.get(c.id) ?? 0), 0));
-      return [{ unidadId: u.id, etiqueta: `Apto ${etiqueta(u)}`, propietario: u.propietario, cargadoUsd: cargado, pagadoUsd: pagado,
+      return [{ unidadId: u.id, etiqueta: etiquetaChat(u), propietario: u.propietario, cargadoUsd: cargado, pagadoUsd: pagado,
                 pendienteUsd: r2(Math.max(cargado - pagado, 0)) }];
     }).sort((a, b) => b.pendienteUsd - a.pendienteUsd || a.etiqueta.localeCompare(b.etiqueta));
   },
@@ -1000,8 +1042,110 @@ export const demoApi: Api = {
       anonimo: nr.anonimo, autorId: nr.anonimo ? null : s.usuarioId, autorNombre: nr.anonimo ? null : s.nombre,
       autorPrivado: s.usuarioId, visibilidad: nr.visibilidad, estado: 'nuevo',
       fotos: nr.fotos.map((f) => URL.createObjectURL(f)), creadoEn: new Date().toISOString(), esMio: true,
+      unidadId: nr.unidadId ?? null, unidad: nr.unidadId ? etiquetaChat(unidad(nr.unidadId)) : null,
     });
+    if (nr.unidadId && nr.visibilidad !== 'presidencia') { reportes.pop(); throw new Error('Un reporte sobre una casa solo puede ir a la junta'); }
     await espera();
+  },
+
+  // ---- Transparencia y convivencia ----
+  async convivencia() { exigir(); return { ...convivencia }; },
+  async fijarConvivencia(k) {
+    exigirPresidencia();
+    const antes = convivencia.morososPublicos;
+    Object.assign(convivencia, k);
+    if (antes === 'no' && k.morososPublicos !== 'no') {
+      notificar(todosLosMiembros(), 'general', 'Lista de cuotas vencidas',
+        `La junta publicará en la app las casas con ${k.morososMesesMin} o más ${k.morososMesesMin === 1 ? 'mes' : 'meses'} de cuotas vencidas`
+        + `${k.morososPublicos === 'casas_y_montos' ? ' y el monto que deben' : ''}. No se muestran nombres. Si tiene pagos pendientes, póngase al día desde "Pagar".`,
+        { pantalla: 'morosos' });
+    }
+  },
+  async morosos(vistaPrevia) {
+    const s = exigir(); await espera();
+    if (convivencia.morososPublicos === 'no' && !(vistaPrevia && s.esJunta)) throw new Error('La junta no ha publicado la lista de cuotas vencidas');
+    const conMonto = convivencia.morososPublicos === 'casas_y_montos' || (vistaPrevia && s.esJunta);
+    return morososDe().map((m) => ({ ...m, montoVencidoUsd: conMonto ? m.montoVencidoUsd : null }));
+  },
+  async mensajesAnonimos() {
+    const s = exigir(); await espera();
+    return anonimos.filter((a) => a.aUnidadId === s.unidadId || a.autorId === s.usuarioId)
+      .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn)).map((a) => vistaAnonimo(a, s.unidadId));
+  },
+  async enviarMensajeAnonimo(m) {
+    const s = exigir(); await espera();
+    if (!convivencia.mensajesAnonimos) throw new Error('La junta de condominio desactivó los mensajes anónimos entre casas');
+    if (m.unidadId === s.unidadId) throw new Error('No puede enviarse un mensaje anónimo a su propia casa');
+    if (!usuariosDeUnidad(m.unidadId).length) throw new Error('Esa casa todavía no usa la app: envíe el reporte a la junta');
+    if (bloqueosAnon.some((b) => b.autorId === s.usuarioId && b.hasta > Date.now())) throw new Error('La junta suspendió sus mensajes anónimos por un mensaje denunciado');
+    const dia = Date.now() - 86_400_000;
+    const mios = anonimos.filter((a) => a.autorId === s.usuarioId && Date.parse(a.creadoEn) > dia);
+    if (mios.length >= 3) throw new Error('Límite de 3 mensajes anónimos por día alcanzado');
+    if (mios.some((a) => a.aUnidadId === m.unidadId)) throw new Error('Ya le envió un mensaje anónimo a esa casa hoy. Espere su respuesta o escriba mañana');
+    if (m.texto.trim().length < 3) throw new Error('Escriba el mensaje');
+    let reporteId: string | null = null;
+    if (m.tambienJunta) {
+      await demoApi.crearReporte({ categoria: m.categoria, titulo: m.titulo || `Reporte sobre ${etiquetaChat(unidad(m.unidadId))}`,
+        descripcion: m.texto.trim(), ubicacion: '', anonimo: true, visibilidad: 'presidencia', fotos: m.fotos, unidadId: m.unidadId });
+      reporteId = reportes[reportes.length - 1].id;
+    }
+    const a: AnonimoDemo = { id: id(), aUnidadId: m.unidadId, autorId: s.usuarioId, categoria: m.categoria, texto: m.texto.trim(),
+      fotos: m.fotos.map((f) => URL.createObjectURL(f)), tambienJunta: m.tambienJunta, leidoEn: null, denunciadoEn: null, revision: null,
+      creadoEn: new Date().toISOString(), respuestas: [], motivo: null };
+    anonimos.push(a);
+    notificar(usuariosDeUnidad(m.unidadId), 'mensaje_anonimo', 'Mensaje anónimo de un vecino',
+      `Un vecino le dejó un mensaje sin su nombre${m.tambienJunta ? ' (también lo recibió la junta)' : ''}. Puede leerlo y responder sin saber quién es.`,
+      { pantalla: 'anonimos', mensajeId: a.id });
+    return { id: a.id, reporteId };
+  },
+  async marcarAnonimoLeido(mid) {
+    const s = exigir();
+    const a = anonimos.find((x) => x.id === mid);
+    if (a && a.aUnidadId === s.unidadId && !a.leidoEn) a.leidoEn = new Date().toISOString();
+  },
+  async responderAnonimo(mid, texto) {
+    const s = exigir();
+    const a = anonimos.find((x) => x.id === mid && (x.aUnidadId === s.unidadId || x.autorId === s.usuarioId));
+    if (!a) throw new Error('No se encontró.');
+    if (a.revision === 'bloqueado') throw new Error('Esta conversación fue cerrada por la junta');
+    if (!texto.trim()) throw new Error('Escriba la respuesta');
+    const de = a.aUnidadId === s.unidadId ? 'casa' : 'remitente';
+    if (a.respuestas.filter((r) => r.de === de).length >= 10) throw new Error('Esta conversación llegó a su límite de respuestas');
+    a.respuestas.push({ id: id(), de, texto: texto.trim(), creadoEn: new Date().toISOString() });
+    if (de === 'casa') notificar([a.autorId], 'mensaje_anonimo', 'Respondieron su mensaje anónimo', `${etiquetaChat(unidad(a.aUnidadId))} respondió a su mensaje. Ellos no saben quién es usted.`, { pantalla: 'anonimos', mensajeId: a.id });
+    else { a.leidoEn = null; notificar(usuariosDeUnidad(a.aUnidadId), 'mensaje_anonimo', 'Nueva respuesta anónima', 'El vecino que le escribió respondió.', { pantalla: 'anonimos', mensajeId: a.id }); }
+  },
+  async denunciarAnonimo(mid, motivo) {
+    const s = exigir();
+    const a = anonimos.find((x) => x.id === mid);
+    if (!a || a.aUnidadId !== s.unidadId) throw new Error('Sin permiso');
+    if (a.denunciadoEn) throw new Error('Ese mensaje ya fue denunciado');
+    if (motivo.trim().length < 3) throw new Error('Indique por qué lo denuncia');
+    a.denunciadoEn = new Date().toISOString(); a.motivo = motivo.trim();
+    notificar(miembrosDemo.filter((m) => m.activo && ['presidente', 'tesorero', 'vocal', 'administrador'].includes(m.rol)).map((m) => m.usuarioId),
+      'denuncia_anonima', 'Mensaje anónimo denunciado',
+      `${etiquetaChat(unidad(a.aUnidadId))} denunció un mensaje anónimo que recibió. Revíselo: puede suspender al remitente sin saber quién es.`,
+      { pantalla: 'denuncias', mensajeId: a.id });
+  },
+  async denunciasAnonimas() {
+    const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    return anonimos.filter((a) => a.denunciadoEn).sort((a, b) => Number(!!a.revision) - Number(!!b.revision) || b.denunciadoEn!.localeCompare(a.denunciadoEn!))
+      .map((a): DenunciaAnonima => ({
+        id: a.id, aUnidad: etiquetaChat(unidad(a.aUnidadId)), categoria: a.categoria, texto: a.texto, fotos: a.fotos, motivo: a.motivo,
+        denunciadoEn: a.denunciadoEn!, revision: a.revision, creadoEn: a.creadoEn, respuestas: a.respuestas,
+        reincidente: anonimos.some((o) => o.id !== a.id && o.autorId === a.autorId && o.denunciadoEn),
+      }));
+  },
+  async revisarDenuncia(mid, accion, dias = 30) {
+    const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');
+    const a = anonimos.find((x) => x.id === mid && x.denunciadoEn);
+    if (!a) throw new Error('No se encontró.');
+    a.revision = accion === 'bloquear' ? 'bloqueado' : 'descartada';
+    if (accion === 'bloquear') {
+      bloqueosAnon.push({ autorId: a.autorId, hasta: Date.now() + dias * 86_400_000 });
+      notificar([a.autorId], 'general', 'Mensajes anónimos suspendidos',
+        `La junta revisó un mensaje anónimo suyo que fue denunciado y suspendió sus mensajes anónimos por ${dias} días. La junta no sabe quién es usted.`, { pantalla: 'anonimos' });
+    }
   },
   async cambiarEstadoReporte(rid, estado, respuesta) {
     const s = exigir(); if (!s.esJunta) throw new Error('Sin permiso');

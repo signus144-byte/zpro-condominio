@@ -5,6 +5,6 @@
 //   const bytes = await estadoCuentaPdf(marca, await api.estadoCuenta(unidadId), { codigo, tasaBcv });
 //   await descargar(bytes, `Estado de cuenta ${etiqueta}.pdf`, MIME.pdf);
 export * from './comun';
-export { estadoCuentaPdf, reciboPdf, solvenciaPdf, relacionGastosPdf, actaVotacionPdf, reporteMensualPdf, type DatosSolvencia } from './plantillas-pdf';
+export { estadoCuentaPdf, reciboPdf, solvenciaPdf, relacionGastosPdf, actaVotacionPdf, reporteMensualPdf, morososPdf, type DatosSolvencia } from './plantillas-pdf';
 export { estadoCuentaXlsx, relacionGastosXlsx, morosidadXlsx, reporteMensualXlsx, libroIngresosEgresosXlsx } from './plantillas-xlsx';
 export { sha256, descargar, nombreArchivo, MIME } from './descarga';

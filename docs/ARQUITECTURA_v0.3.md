@@ -133,3 +133,18 @@ A diferencia del plan anterior (Supabase), **el chat en tiempo real sí cabe en 
 - `cerrar_mes()` guarda ese JSON en `cierres_mensuales`. Solo se cierran meses terminados, y se puede volver a cerrar.
 - `cierre_automatico()` cierra el mes anterior el día 1 a las 7:30.
 - La app genera el PDF (para firma y sello), el Excel (Resumen, Casas, Pagos, Gastos, Libro, Cuentas y Cuotas especiales) y el libro de ingresos y egresos.
+
+## 10. Transparencia y convivencia (v0.8, 0025_convivencia.sql)
+
+- **Lista de cuotas vencidas** (`condominios.morosos_publicos`: no / casas / casas_y_montos; `morosos_meses_min`).
+  - `morosos_publicos()` cuenta lo que falta de recibos ya vencidos (según `pago_aplicaciones`) y nunca devuelve nombres.
+  - La decide presidencia o la administración (`fijar_convivencia`, con bitácora). Al encenderla se avisa a todos.
+- **Mensajes anónimos a una casa.**
+  - La autoría vive en tablas sin políticas RLS: `mensajes_anonimos_autoria` y `bloqueos_anonimos`. Nadie la lee desde la app, ni siquiera la junta. El servidor la usa para:
+    - los límites (3 por día; 1 por día a la misma casa);
+    - avisar al remitente cuando le responden;
+    - las suspensiones.
+  - La casa puede responder y denunciar. La junta ve solo los mensajes denunciados (contenido, casa y motivo) y puede suspender al remitente sin conocerlo.
+  - Fotos en el bucket `anonimos`, re-codificadas sin EXIF y sin dueño. Las ven la casa destinataria, el remitente y, si hay denuncia, la junta.
+  - Advertencia honesta: quien tenga acceso directo a la base de datos del servidor podría consultar la autoría. Se guarda para frenar el abuso y por si una autoridad la exige.
+- **Reportes sobre una casa:** `reportes.unidad_id` (solo con visibilidad presidencia).

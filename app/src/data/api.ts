@@ -9,6 +9,7 @@ import type {
   ParticipanteAlerta, RespuestaAlerta,
   AlcanceDifusion, Difusion, GrupoUnidades, NuevaDifusion, NuevoGrupo, PreviaDifusion, UnidadAlcance,
   CierreMes, CobroPartidaCasa, LecturaTasa, ReporteDelMes, ResultadoConfirmarTasa, TasaBcv,
+  ConfigConvivencia, DenunciaAnonima, MensajeAnonimo, MorosoPublico, NuevoMensajeAnonimo,
 } from './tipos';
 
 /** Resultado de un mensaje masivo. */
@@ -147,6 +148,21 @@ export interface Api {
   descargarAdjunto(a: Adjunto): Promise<Blob>;
   bloquearCasa(unidadId: string, bloquear: boolean): Promise<void>;
   denunciarMensaje(mensajeId: string, motivo: string): Promise<void>;
+
+  // ---------------- Transparencia y convivencia (v0.8) ----------------
+  convivencia(): Promise<ConfigConvivencia>;
+  /** Presidencia o administración: lista de cuotas vencidas (no / casas / casas y montos) y mensajes anónimos. */
+  fijarConvivencia(c: ConfigConvivencia): Promise<void>;
+  /** Casas con cuotas vencidas (sin nombres). vistaPrevia: la junta la ve aunque esté apagada. */
+  morosos(vistaPrevia?: boolean): Promise<MorosoPublico[]>;
+  mensajesAnonimos(): Promise<MensajeAnonimo[]>;
+  enviarMensajeAnonimo(m: NuevoMensajeAnonimo): Promise<{ id: string; reporteId: string | null }>;
+  marcarAnonimoLeido(id: string): Promise<void>;
+  responderAnonimo(id: string, texto: string): Promise<void>;
+  /** La casa que lo recibió lo denuncia a la junta (ofensivo o falso). */
+  denunciarAnonimo(id: string, motivo: string): Promise<void>;
+  denunciasAnonimas(): Promise<DenunciaAnonima[]>;                       // junta
+  revisarDenuncia(id: string, accion: 'bloquear' | 'descartar', dias?: number): Promise<void>;
 
   // ---------------- Alerta vecinal (v0.5) ----------------
   configAlerta(): Promise<ConfigAlerta>;

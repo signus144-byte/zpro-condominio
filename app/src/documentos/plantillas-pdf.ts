@@ -1,5 +1,5 @@
 // Plantillas PDF con la marca del condominio.
-import type { Cargo, CuentaFinanciera, EstadoCuenta, FilaActa, Gasto, Partida, ReporteDelMes, Unidad } from '../data/tipos';
+import type { Cargo, CuentaFinanciera, EstadoCuenta, FilaActa, Gasto, MorosoPublico, Partida, ReporteDelMes, Unidad } from '../data/tipos';
 import {
   libroDelMes,
   ESTADO_PAGO, METODOS, TIPO_CARGO, URL_VERIFICAR, bs, etiquetaUnidad, fechaCorta, fechaLarga, mesLargo, pct, r2, usd,
@@ -279,6 +279,21 @@ export async function reporteMensualPdf(marca: MarcaDoc, rep: ReporteDelMes, o: 
     ], d.partidas.map((p) => ({ celdas: [`${p.titulo} (${p.casas} casas)`, usd(p.presupuestoUsd), usd(p.emitidoUsd), usd(p.cobradoUsd),
                                          p.emitidoUsd ? pct(r2(100 * p.cobradoUsd / p.emitidoUsd)) : '—'] })));
   }
+  l.firmas(['Presidencia', 'Tesorería']);
+  return l.terminar();
+}
+
+
+// ---------------- Lista de cuotas vencidas (para la cartelera) ----------------
+export async function morososPdf(marca: MarcaDoc, lista: MorosoPublico[], conMonto: boolean, mesesMin: number, o: OpcionesDoc = {}): Promise<Uint8Array> {
+  const l = await Lienzo.crear(marca, { titulo: 'Casas con cuotas vencidas', subtitulo: `Al ${fechaCorta(o.fecha ?? new Date())} · ${mesesMin} o más ${mesesMin === 1 ? 'mes' : 'meses'} vencidos`, codigo: o.codigo, fecha: o.fecha });
+  l.parrafo('La junta de condominio publica esta lista para la transparencia de todos. Si su casa aparece y ya pagó, comuníquese con la junta. Puede ponerse al día desde la app Vecinos ZPro.', { tam: 9.5 });
+  l.espacio(6);
+  l.tabla([
+    { titulo: 'Casa', ancho: conMonto ? 0.4 : 0.55 }, { titulo: 'Meses vencidos', ancho: 0.2, alinear: 'der' }, { titulo: 'Desde', ancho: conMonto ? 0.2 : 0.25 },
+    ...(conMonto ? [{ titulo: 'Monto vencido', ancho: 0.2, alinear: 'der' as const }] : []),
+  ], lista.map((m) => ({ celdas: [m.etiqueta, String(m.mesesVencidos), mesLargo(m.desde), ...(conMonto ? [usd(m.montoVencidoUsd ?? 0)] : [])] })));
+  if (conMonto) l.parrafo(`Total vencido: ${usd(r2(lista.reduce((s, m) => s + (m.montoVencidoUsd ?? 0), 0)))} · ${lista.length} casas.`, { negrita: true });
   l.firmas(['Presidencia', 'Tesorería']);
   return l.terminar();
 }

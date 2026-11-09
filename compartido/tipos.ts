@@ -29,7 +29,12 @@ export interface Condominio {
   id: string; nombre: string; rif: string | null; direccion: string | null;
   fondoReservaPct: number; diaVencimiento: number;
   chatVecinos: boolean;              // la junta permite el chat casa ↔ casa (apagado por defecto)
+  /** v0.8: lista pública de casas con cuotas vencidas ('no' = apagada, por defecto). */
+  morososPublicos?: ModoMorosos; morososMesesMin?: number;
+  /** v0.8: los vecinos pueden enviar mensajes anónimos a otra casa (encendido por defecto). */
+  mensajesAnonimos?: boolean;
 }
+export type ModoMorosos = 'no' | 'casas' | 'casas_y_montos';
 
 export interface Unidad { id: string; bloque: string | null; numero: string; alicuota: number; propietario: string | null }
 export interface UnidadConSaldo extends Unidad { cargosUsd: number; pagadoUsd: number; saldoUsd: number }
@@ -121,10 +126,14 @@ export interface Reporte {
   id: string; categoria: CategoriaReporte; titulo: string; descripcion: string; ubicacion: string | null;
   anonimo: boolean; autorNombre: string | null; visibilidad: Visibilidad; estado: EstadoReporte;
   fotos: string[]; creadoEn: string; esMio: boolean;
+  /** v0.8: casa a la que se refiere (solo la ven la junta y quien lo envió). */
+  unidadId?: string | null; unidad?: string | null;
 }
 export interface NuevoReporte {
   categoria: CategoriaReporte; titulo: string; descripcion: string; ubicacion: string;
   anonimo: boolean; visibilidad: Visibilidad; fotos: Blob[];
+  /** v0.8: casa a la que se refiere (solo con visibilidad 'presidencia'). */
+  unidadId?: string;
 }
 
 export interface Aviso { id: string; titulo: string; cuerpo: string; fijado: boolean; creadoEn: string }
@@ -259,13 +268,13 @@ export type EventoTiempoReal =
 
 // ---------------- v0.4: notificaciones ----------------
 export type TipoNotificacion = 'pago_reportado' | 'pago_confirmado' | 'pago_rechazado' | 'pagos_pendientes' | 'chat_vecinos' | 'general'
-  | 'alerta' | 'alerta_cerrada' | 'solicitud_ingreso' | 'difusion' | 'cierre_mes' | 'tasa_bcv';
+  | 'alerta' | 'alerta_cerrada' | 'solicitud_ingreso' | 'difusion' | 'cierre_mes' | 'tasa_bcv' | 'mensaje_anonimo' | 'denuncia_anonima';
 export interface Notificacion {
   id: string; tipo: TipoNotificacion; condominioId: string | null;
   titulo: string; cuerpo: string;
   datos: { pagoId?: string; alertaId?: string; tipoAlerta?: TipoAlerta;
-           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos' | 'partidas' | 'avisos' | 'cierre' | 'tasa'; pendientes?: number;
-           partidaId?: string; difusionId?: string; periodo?: string };
+           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos' | 'partidas' | 'avisos' | 'cierre' | 'tasa' | 'anonimos' | 'denuncias' | 'morosos'; pendientes?: number;
+           partidaId?: string; difusionId?: string; periodo?: string; mensajeId?: string };
   leida: boolean; creadoEn: string;
 }
 export interface BandejaNotificaciones { noLeidas: number; notificaciones: Notificacion[] }
@@ -389,3 +398,27 @@ export interface ReporteDelMes {
   datos: ReporteMensual;
 }
 export interface CierreMes { periodo: string; cerradoEn: string; automatico: boolean; por: string | null }
+
+// ---------------- v0.8: transparencia y convivencia ----------------
+/** Casa con cuotas vencidas en la lista pública (nunca lleva nombres). montoVencidoUsd = null si la junta no publica montos. */
+export interface MorosoPublico { unidadId: string; etiqueta: string; mesesVencidos: number; montoVencidoUsd: number | null; desde: string }
+export interface ConfigConvivencia { morososPublicos: ModoMorosos; morososMesesMin: number; mensajesAnonimos: boolean }
+
+export interface RespuestaAnonima { id: string; de: 'casa' | 'remitente'; texto: string; creadoEn: string }
+/** Mensaje anónimo a una casa. Nunca trae quién lo envió. */
+export interface MensajeAnonimo {
+  id: string; direccion: 'recibido' | 'enviado'; aUnidad: string; categoria: CategoriaReporte; texto: string; fotos: string[];
+  tambienJunta: boolean; leidoEn: string | null; denunciadoEn: string | null; revision: 'bloqueado' | 'descartada' | null;
+  creadoEn: string; respuestas: RespuestaAnonima[];
+}
+export interface NuevoMensajeAnonimo {
+  unidadId: string; categoria: CategoriaReporte; texto: string; fotos: Blob[];
+  /** Enviar también a la junta como reporte anónimo (con la casa relacionada). */
+  tambienJunta: boolean; titulo?: string;
+}
+/** Para la junta: un mensaje anónimo denunciado por la casa que lo recibió (sin remitente). */
+export interface DenunciaAnonima {
+  id: string; aUnidad: string; categoria: CategoriaReporte; texto: string; fotos: string[]; motivo: string | null;
+  denunciadoEn: string; revision: 'bloqueado' | 'descartada' | null; creadoEn: string; respuestas: RespuestaAnonima[];
+  reincidente: boolean;   // el mismo remitente ya tuvo otro mensaje denunciado (sin decir quién)
+}

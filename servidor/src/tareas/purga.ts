@@ -19,7 +19,7 @@ export async function purgarChat(ctx: Contexto, lote = 1000, maxLotes = 50) {
   return { archivos, mensajes };
 }
 
-const BUCKETS = ['chat', 'comprobantes', 'facturas', 'reportes', 'marca', 'documentos'];
+const BUCKETS = ['chat', 'comprobantes', 'facturas', 'reportes', 'marca', 'documentos', 'anonimos'];
 
 /**
  * Archivos huérfanos: bytes en disco sin fila en storage.objects (p. ej. una subida cuya transacción falló).

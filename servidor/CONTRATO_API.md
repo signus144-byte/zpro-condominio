@@ -1,4 +1,4 @@
-# Contrato de la API · Vecinos ZPro v0.7
+# Contrato de la API · Vecinos ZPro v0.8
 
 Base: `/api/v1`. JSON en camelCase. Los tipos de respuesta están en `compartido/tipos.ts` (app) y
 `compartido/plataforma.ts` (consola): **el servidor devuelve exactamente esos tipos**.
@@ -211,6 +211,21 @@ portón propio, un piso con su llave). Con alcance limitado **solo esas casas la
 | PUT `c/:cid/alerta/cercania` | + `piso` por casa | el piso se deduce del número si no se carga (34 → 3, 1204 → 12) |
 
 Cada difusión llega como notificación `difusion` (app, push y correo) a las personas de esas casas, salvo quien la envía.
+
+## 8f. Transparencia y convivencia (`src/rutas/convivencia.ts`) ✅ — v0.8
+
+| Método y ruta | Cuerpo / consulta | Respuesta |
+|---|---|---|
+| GET `c/:cid/convivencia` | — | `ConfigConvivencia` |
+| PUT `c/:cid/convivencia` | `{morososPublicos: 'no'\|'casas'\|'casas_y_montos', morososMesesMin, mensajesAnonimos}` | 204 (presidente o administrador; bitácora; al encender la lista se avisa a todos) |
+| GET `c/:cid/morosos?vistaPrevia=1` | — | `MorosoPublico[]` (sin nombres; `montoVencidoUsd` null si no se publican montos). 400 si está apagada (la junta puede pedir vista previa) |
+| POST `c/:cid/anonimos` | multipart: `unidadId, categoria, texto, tambienJunta, titulo?` + `fotos` (≤ 4) | 201 `{id, reporteId}` · límites: 3/día, 1/día a la misma casa; no a su propia casa; la casa debe usar la app |
+| GET `c/:cid/anonimos` | — | `MensajeAnonimo[]` (recibidos por mis casas y enviados por mí; nunca el remitente) |
+| POST `c/:cid/anonimos/:id/leido` · `/responder {texto}` · `/denunciar {motivo}` | | 204 |
+| GET `c/:cid/anonimos/denuncias` | — | `DenunciaAnonima[]` (junta; contenido, casa y motivo, sin remitente) |
+| POST `c/:cid/anonimos/:id/revisar` | `{accion: 'bloquear'\|'descartar', dias?}` | 204 · bloquear suspende al remitente sin revelarlo |
+
+POST `c/:cid/reportes` acepta `unidadId` (casa relacionada; solo con visibilidad `presidencia`). `Reporte` trae `unidadId` y `unidad`.
 
 ## 9. Plataforma / consola master (`src/rutas/plataforma.ts`) ✅
 

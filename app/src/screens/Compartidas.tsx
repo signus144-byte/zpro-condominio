@@ -13,6 +13,7 @@ import { CATEGORIAS, ESTADO_PARTIDA, ESTADO_REPORTE, fecha, mes, mesSiguiente, p
 // ---------------- Reportes ----------------
 export function Reportes() {
   const s = api.sesion()!;
+  const ir = useNavigate();
   const { datos, cargando, error, recargar } = useCarga(() => api.reportes());
   const [filtro, setFiltro] = useState<'abiertos' | 'mios' | 'todos'>(s.esJunta ? 'abiertos' : 'todos');
   const lista = (datos ?? []).filter((r) =>
@@ -45,6 +46,10 @@ export function Reportes() {
             <h3>{r.titulo}</h3>
             <p>{r.descripcion}</p>
             {r.fotos.length > 0 && <div className="fotos">{r.fotos.map((f) => <img key={f} src={f} alt="Foto del reporte" />)}</div>}
+            {r.unidad && <div className="partida-alcance"><Etiqueta tono="info">Sobre: {r.unidad}</Etiqueta>
+              {s.esJunta && r.unidadId && SABOR !== 'miembros' && (
+                <button className="btn-texto" onClick={() => void api.abrirConCasa(r.unidadId!).then((cid) => ir(`/p/chats/${cid}`))}>Escribir a esa casa como junta</button>
+              )}</div>}
             <small className="meta">
               {r.ubicacion && <>{r.ubicacion} · </>}
               {r.anonimo ? 'Anónimo' : r.autorNombre ?? 'Vecino'} · {fecha(r.creadoEn)}
@@ -66,65 +71,116 @@ export function Reportes() {
   );
 }
 
+type Destino = 'junta' | 'casa' | 'ambos';
+
 export function NuevoReporte() {
   const ir = useNavigate();
-  const [categoria, setCategoria] = useState<CategoriaReporte>('ruido');
+  const [params] = useSearchParams();
+  const s = api.sesion()!;
+  const condo = useCarga(() => api.condominio());
+  const casasDir = useCarga(() => api.directorio());
+  const anonimosActivos = condo.datos?.mensajesAnonimos !== false;
+  const [destino, setDestino] = useState<Destino>(params.get('a') === 'casa' ? 'casa' : 'junta');
+  const [casa, setCasa] = useState('');
+  const [categoria, setCategoria] = useState<CategoriaReporte>(params.get('a') === 'casa' ? 'otro' : 'ruido');
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [ubicacion, setUbicacion] = useState('');
-  const [anonimo, setAnonimo] = useState(false);
+  const [anonimo, setAnonimo] = useState(true);
   const [visibilidad, setVisibilidad] = useState<Visibilidad>('presidencia');
   const [fotos, setFotos] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
-  // En reportes anónimos el servidor guarda las fotos sin dueño y les quita los datos ocultos (GPS, modelo del teléfono).
-  const fotosPermitidas = true;
+  const aCasa = destino !== 'junta';
+  const casas = (casasDir.datos ?? []).filter((c) => c.unidadId !== s.unidadId);
+  // Un reporte sobre una casa va solo a la junta (señalar una casa en público crea roces).
+  const visibilidadReal: Visibilidad = casa ? 'presidencia' : visibilidad;
 
   async function enviar(ev: React.FormEvent) {
     ev.preventDefault();
-    setError(null); setEnviando(true);
+    setError(null);
+    if (aCasa && !casa) return setError('Elija la casa a la que le escribe.');
+    if (!aCasa && titulo.trim().length < 3) return setError('Escriba un título.');
+    setEnviando(true);
     try {
-      await api.crearReporte({ categoria, titulo, descripcion, ubicacion, anonimo, visibilidad, fotos: fotosPermitidas ? fotos : [] });
-      ir('/r/reportes');
+      if (aCasa) {
+        await api.enviarMensajeAnonimo({ unidadId: casa, categoria, texto: descripcion, fotos, tambienJunta: destino === 'ambos', titulo: titulo.trim() || undefined });
+        ir('/r/anonimos');
+      } else {
+        await api.crearReporte({ categoria, titulo, descripcion, ubicacion, anonimo, visibilidad: visibilidadReal, fotos, unidadId: casa || undefined });
+        ir('/r/reportes');
+      }
     } catch (e) { setError((e as Error).message); } finally { setEnviando(false); }
   }
 
   return (
     <form className="formulario" onSubmit={enviar}>
+      <Tarjeta titulo="¿A quién se lo envía?">
+        <div className="chips">
+          <button type="button" className={`chip ${destino === 'junta' ? 'chip-activo' : ''}`} onClick={() => setDestino('junta')}>A la junta</button>
+          {anonimosActivos && <>
+            <button type="button" className={`chip ${destino === 'casa' ? 'chip-activo' : ''}`} onClick={() => setDestino('casa')}>A una casa, sin mi nombre</button>
+            <button type="button" className={`chip ${destino === 'ambos' ? 'chip-activo' : ''}`} onClick={() => setDestino('ambos')}>A los dos</button>
+          </>}
+        </div>
+        <p className="nota">{destino === 'junta'
+          ? 'La junta recibe su reporte. Puede indicar la casa de la que se trata para que la junta le llame la atención.'
+          : destino === 'casa' ? 'Le llega directo a esa casa. Nadie sabrá que fue usted: ni la casa, ni la junta. La casa podrá responderle sin saber quién es.'
+          : 'Le llega a esa casa sin su nombre y la junta recibe también un reporte anónimo, por si hace falta que intervenga.'}</p>
+        <Campo etiqueta={aCasa ? '¿A qué casa?' : '¿Sobre qué casa? (opcional)'}>
+          <select value={casa} onChange={(e) => setCasa(e.target.value)} required={aCasa}>
+            <option value="">{aCasa ? 'Elija la casa…' : 'Ninguna en particular'}</option>
+            {casas.map((c) => <option key={c.unidadId} value={c.unidadId}>{c.etiqueta}</option>)}
+          </select>
+        </Campo>
+      </Tarjeta>
+
       <Tarjeta titulo="¿Qué está pasando?">
         <div className="chips">
           {(Object.keys(CATEGORIAS) as CategoriaReporte[]).map((c) => (
             <button type="button" key={c} className={`chip ${categoria === c ? 'chip-activo' : ''}`} onClick={() => setCategoria(c)}>{CATEGORIAS[c]}</button>
           ))}
         </div>
-        <Campo etiqueta="Título"><input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej.: Música muy alta en la noche" required maxLength={80} /></Campo>
-        <Campo etiqueta="Descripción">
-          <textarea rows={4} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} required
-                    placeholder="Describa lo que ocurre, desde cuándo y a qué hora." />
+        {destino !== 'casa' && (
+          <Campo etiqueta="Título"><input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ej.: El perro de la 3B ensucia la entrada" maxLength={80} required={destino === 'junta'} /></Campo>
+        )}
+        <Campo etiqueta={aCasa ? 'Mensaje' : 'Descripción'}>
+          <textarea rows={4} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} required minLength={3}
+                    placeholder={aCasa ? 'Ej.: Cada vez que bajan al perrito hace sus necesidades frente a la entrada. Les agradecería recogerlo.'
+                                       : 'Describa lo que ocurre, desde cuándo y a qué hora.'} />
         </Campo>
-        <Campo etiqueta="Ubicación" ayuda="Bloque, apartamento o área común">
-          <input value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} placeholder="Ej.: Bloque B, apto 34" />
-        </Campo>
-        {fotosPermitidas ? (
-          <Campo etiqueta="Fotos (opcional)">
-            <input type="file" accept="image/*" multiple onChange={(e) => setFotos([...(e.target.files ?? [])].slice(0, 4))} />
+        {!aCasa && (
+          <Campo etiqueta="Ubicación" ayuda="Bloque, apartamento o área común">
+            <input value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} placeholder="Ej.: Entrada del edificio B" />
           </Campo>
-        ) : null}
+        )}
+        <Campo etiqueta="Fotos (opcional)" ayuda="Se les borran los datos ocultos (ubicación GPS y modelo del teléfono) antes de guardarlas.">
+          <input type="file" accept="image/*" multiple onChange={(e) => setFotos([...(e.target.files ?? [])].slice(0, 4))} />
+        </Campo>
       </Tarjeta>
 
-      <Tarjeta titulo="Privacidad">
-        <label className="interruptor">
-          <input type="checkbox" checked={anonimo} onChange={(e) => setAnonimo(e.target.checked)} />
-          <span><strong>Enviar como anónimo</strong><small>Presidencia y los vecinos no verán su nombre. Usted podrá seguir el caso en “Mis reportes”.</small></span>
-        </label>
-        <div className="chips">
-          <button type="button" className={`chip ${visibilidad === 'presidencia' ? 'chip-activo' : ''}`} onClick={() => setVisibilidad('presidencia')}>Solo Presidencia</button>
-          <button type="button" className={`chip ${visibilidad === 'comunidad' ? 'chip-activo' : ''}`} onClick={() => setVisibilidad('comunidad')}>Compartir con vecinos</button>
+      {!aCasa ? (
+        <Tarjeta titulo="Privacidad">
+          <label className="interruptor">
+            <input type="checkbox" checked={anonimo} onChange={(e) => setAnonimo(e.target.checked)} />
+            <span><strong>Enviar sin mi nombre (anónimo)</strong><small>Ni la junta ni los vecinos sabrán quién lo envió. Usted podrá seguir el caso en “Mis reportes”.</small></span>
+          </label>
+          {casa ? <p className="nota">Como se refiere a una casa, este reporte lo ve <strong>solo la junta</strong>.</p> : (
+            <div className="chips">
+              <button type="button" className={`chip ${visibilidad === 'presidencia' ? 'chip-activo' : ''}`} onClick={() => setVisibilidad('presidencia')}>Solo la junta</button>
+              <button type="button" className={`chip ${visibilidad === 'comunidad' ? 'chip-activo' : ''}`} onClick={() => setVisibilidad('comunidad')}>Compartir con vecinos</button>
+            </div>
+          )}
+        </Tarjeta>
+      ) : (
+        <div className="aviso aviso-info privacidad-anonima">
+          <strong>🔒 Siempre anónimo</strong>
+          <p>La casa no verá su nombre ni su casa. Úselo con respeto: si el mensaje es ofensivo, la casa puede denunciarlo y la junta puede suspender sus mensajes anónimos (sin saber quién es).</p>
         </div>
-      </Tarjeta>
+      )}
       {error && <div className="aviso aviso-error">{error}</div>}
-      <button className="btn btn-ancho" disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar reporte'}</button>
-      <p className="nota">Para evitar abusos, cada persona puede enviar hasta 5 reportes por día.</p>
+      <button className="btn btn-ancho" disabled={enviando}>{enviando ? 'Enviando…' : aCasa ? 'Enviar sin mi nombre' : 'Enviar reporte'}</button>
+      <p className="nota">{aCasa ? 'Para evitar el acoso: hasta 3 mensajes anónimos por día y 1 por día a la misma casa.' : 'Para evitar abusos, cada persona puede enviar hasta 5 reportes por día.'}</p>
     </form>
   );
 }

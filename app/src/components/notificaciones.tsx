@@ -36,6 +36,9 @@ export function destinoNotificacion(n: Notificacion, prefijo: string): string {
     case 'avisos': return `${prefijo}/notificacion/${n.id}`;
     case 'cierre': return s?.esJunta && SABOR !== 'miembros' ? `/p/cierre${n.datos.periodo ? `?periodo=${n.datos.periodo}` : ''}` : prefijo;
     case 'tasa': return s?.esJunta && SABOR !== 'miembros' ? '/p/tasa' : prefijo;
+    case 'anonimos': return s?.unidadId && SABOR !== 'admin' ? `/r/anonimos${n.datos.mensajeId ? `?m=${n.datos.mensajeId}` : ''}` : prefijo;
+    case 'denuncias': return s?.esJunta && SABOR !== 'miembros' ? '/p/convivencia#denuncias' : prefijo;
+    case 'morosos': return s?.unidadId && SABOR !== 'admin' ? '/r/morosos' : s?.esJunta ? '/p/convivencia' : prefijo;
     default: return prefijo;
   }
 }
@@ -100,7 +103,7 @@ export function Campana() {
 
 const TONO: Record<Notificacion['tipo'], string> = {
   pago_confirmado: 'ok', pago_rechazado: 'error', pago_reportado: 'info', pagos_pendientes: 'alerta', chat_vecinos: 'info', general: 'info',
-  alerta: 'error', alerta_cerrada: 'ok', solicitud_ingreso: 'alerta', difusion: 'info', cierre_mes: 'ok', tasa_bcv: 'alerta',
+  alerta: 'error', alerta_cerrada: 'ok', solicitud_ingreso: 'alerta', difusion: 'info', cierre_mes: 'ok', tasa_bcv: 'alerta', mensaje_anonimo: 'info', denuncia_anonima: 'alerta',
 };
 
 export function Notificaciones() {

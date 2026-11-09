@@ -1,5 +1,13 @@
 # Historial de versiones · Vecinos ZPro
 
+## 0.8 · 9-nov-2026 · Transparencia y convivencia sin represalias
+- **Lista de casas con cuotas vencidas, opcional**: la decide presidencia o la administración. Tres modos: no publicar (por defecto), publicar solo las casas (con los meses vencidos) o publicar casas y montos. Se puede exigir un mínimo de meses vencidos. **Nunca muestra nombres.** Al encenderla se avisa a todos los vecinos. PDF para la cartelera. Cuenta solo recibos ya vencidos y sin pagar; quien paga sale de la lista sola.
+- **Mensajes anónimos a otra casa**: "A una casa, sin mi nombre". Ej.: "El perrito hace pupú en la entrada; les agradecería recogerlo", con foto. La casa lo recibe y puede responder sin saber a quién; la conversación sigue anónima.
+  - Contra el acoso: 3 por día, 1 por día a la misma casa, máximo 10 respuestas por conversación. La casa puede **denunciar** un mensaje ofensivo; la junta ve el mensaje y el motivo (nunca el remitente) y puede **suspender al remitente** de 7 a 365 días sin saber quién es (se le avisa que fue suspendido). La junta también puede desactivar los mensajes anónimos.
+- **Reportes a la junta sobre una casa**: "¿Sobre qué casa?" (opcional). Un reporte sobre una casa lo ve solo la junta, que puede escribirle a esa casa como junta con un toque. Opción "A los dos": la casa recibe el mensaje anónimo y la junta un reporte anónimo.
+- Anónimo por defecto. Las fotos se re-codifican (se borran la ubicación GPS y el modelo del teléfono) y se guardan sin dueño. Quién envió algo anónimo queda en tablas que ninguna pantalla puede leer; el servidor lo usa solo para los límites, las respuestas y las suspensiones.
+- 162 pruebas de la API + reglas SQL, todas pasan.
+
 ## 0.7 · 9-nov-2026 · Tasa BCV garantizada, pago por concepto y cierre del mes
 - **Tasa BCV con dos fuentes.** El servidor consulta cada 30 minutos (todos los días y al arrancar) la página del BCV y DolarApi. La tasa solo se acepta si **las dos dan el mismo número**; si una no responde o no coinciden, no hay tasa y los vecinos **no pueden reportar pagos en bolívares** (en dólares sí). La junta puede servir de segunda fuente copiando el número de bcv.org.ve (toda la junta cuenta como una sola fuente). Si a las 9:05 no hay tasa confirmada, la junta recibe un aviso.
 - Respeta la **fecha valor** del BCV: la tasa publicada el viernes en la tarde rige desde el lunes; el fin de semana sigue la del viernes.

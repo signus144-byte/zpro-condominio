@@ -2,7 +2,7 @@
 // Las plantillas (src/documentos) se cargan solo al usarlas, para no engordar el arranque de la app.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, type Marca, type ReporteDelMes, type TipoDocumento, type UnidadConSaldo } from '../data';
+import { api, type Marca, type MorosoPublico, type ReporteDelMes, type TipoDocumento, type UnidadConSaldo } from '../data';
 import { Campo, Estado, Etiqueta, Tarjeta, Vacio, useCarga } from '../components/ui';
 import { mes, mesAnterior, mesSiguiente, periodoActual, usd } from '../formato';
 import '../documentos/documentos.css';
@@ -65,6 +65,15 @@ export async function documentoReporte(rep: ReporteDelMes, cual: 'pdf' | 'xlsx' 
   const bytes = cual === 'pdf' ? await p.reporteMensualPdf(marca, rep, { codigo })
     : cual === 'xlsx' ? await p.reporteMensualXlsx(marca, rep, { codigo }) : await p.libroIngresosEgresosXlsx(marca, rep, { codigo });
   await p.descargar(bytes, `${cual === 'libro' ? 'Libro de ingresos y egresos' : 'Reporte del mes'} ${mesTxt}.${formato}`, p.MIME[formato]);
+  return aviso;
+}
+
+/** Lista de cuotas vencidas para la cartelera (respeta si la junta publica o no los montos). */
+export async function documentoMorosos(lista: MorosoPublico[], conMonto: boolean, mesesMin: number) {
+  const p = await cargarPlantillas();
+  const marca = await marcaDoc(p);
+  const { codigo, aviso } = await registrar('morosidad', 'pdf');
+  await p.descargar(await p.morososPdf(marca, lista, conMonto, mesesMin, { codigo }), `Cuotas vencidas ${new Date().toISOString().slice(0, 10)}.pdf`, p.MIME.pdf);
   return aviso;
 }
 

@@ -21,6 +21,7 @@ import { ChatVecinos } from './screens/presidencia/Admin';
 import { CapaAlarma, ConfigAlertaJunta, DetalleAlerta, HistorialAlertas, Participacion, Sos, UbicacionCasas } from './screens/alerta/Alerta';
 import { Invitar } from './screens/presidencia/Invitar';
 import { CierreMes } from './screens/presidencia/Cierre';
+import { ConvivenciaJunta, CuotasVencidas, MensajesAnonimos } from './screens/convivencia/Convivencia';
 import { Invitacion } from './screens/cuenta/Invitacion';
 import { SoloOtraApp } from './screens/cuenta/Cuenta';
 import { SABOR } from './sabor';
@@ -132,6 +133,8 @@ export default function App() {
         <Route path="/r/notificaciones" element={<Protegida junta={false} titulo="Notificaciones"><Notificaciones /></Protegida>} />
         <Route path="/r/notificacion/:id" element={<Protegida junta={false} titulo="Mensaje"><NotificacionCompleta /></Protegida>} />
         <Route path="/r/documentos" element={<Protegida junta={false} titulo="Documentos"><DocumentosResidente /></Protegida>} />
+        <Route path="/r/anonimos" element={<Protegida junta={false} titulo="Mensajes anónimos"><MensajesAnonimos /></Protegida>} />
+        <Route path="/r/morosos" element={<Protegida junta={false} titulo="Cuotas vencidas"><CuotasVencidas /></Protegida>} />
         <Route path="/p" element={<Protegida junta titulo="Panel financiero"><Panel /></Protegida>} />
         <Route path="/p/pagos" element={<Protegida junta titulo="Pagos"><PagosPresidencia /></Protegida>} />
         <Route path="/p/gastos" element={<Protegida junta titulo="Gastos y recibos"><Gastos /></Protegida>} />
@@ -157,6 +160,7 @@ export default function App() {
         <Route path="/p/chat-vecinos" element={<Protegida junta titulo="Chat entre vecinos"><ChatVecinos /></Protegida>} />
         <Route path="/p/tasa" element={<Protegida junta titulo="Tasa BCV"><TasaBcv /></Protegida>} />
         <Route path="/p/cierre" element={<Protegida junta titulo="Reporte y cierre del mes"><CierreMes /></Protegida>} />
+        <Route path="/p/convivencia" element={<Protegida junta titulo="Transparencia y convivencia"><ConvivenciaJunta /></Protegida>} />
         <Route path="*" element={<Navigate to={destino()} replace />} />
       </Routes>
     </HashRouter>

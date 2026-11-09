@@ -53,6 +53,11 @@ export function InicioResidente() {
     if (n.tipo === 'pago_confirmado' || n.tipo === 'pago_rechazado') recargarCuenta();
   }), [recargarCuenta]);
   const avisos = useCarga(() => api.avisos());
+  const condo = useCarga(() => api.condominio());
+  const anon = useCarga(() => api.mensajesAnonimos().catch(() => []));
+  const recargarAnon = anon.recargar;
+  useEffect(() => api.suscribirNotificaciones((n) => { if (n.tipo === 'mensaje_anonimo') recargarAnon(); }), [recargarAnon]);
+  const anonSinLeer = (anon.datos ?? []).filter((m) => m.direccion === 'recibido' && !m.leidoEn).length;
   const tasa = useTasaDelDia();
   const e = cuenta.datos;
   const grupos = e ? gruposDeuda(e) : [];
@@ -103,8 +108,17 @@ export function InicioResidente() {
         )}
       </Estado>
 
+      <Tarjeta titulo="Convivencia" className="convivencia-inicio">
+        <div className="accesos">
+          <Link to="/r/reportes/nuevo" className="acceso"><strong>📣</strong><span>Reportar algo a la junta o a una casa, sin su nombre si quiere</span></Link>
+          <Link to="/r/anonimos" className="acceso"><strong>{anonSinLeer || '✉️'}</strong><span>{anonSinLeer ? 'mensajes anónimos sin leer' : 'Mensajes anónimos'}</span></Link>
+        </div>
+        {condo.datos && condo.datos.morososPublicos && condo.datos.morososPublicos !== 'no' && (
+          <Link to="/r/morosos" className="btn-texto">Ver casas con cuotas vencidas (publicado por la junta) ›</Link>
+        )}
+      </Tarjeta>
+
       <div className="fila-botones">
-        <Link className="btn btn-sec" to="/r/reportes/nuevo">Reportar una irregularidad</Link>
         <Link className="btn btn-sec" to="/r/documentos">Documentos y solvencia</Link>
       </div>
 

@@ -13,11 +13,11 @@ import { ErrorApi } from '../util/errores.js';
 import { ParamsC, Uuid } from './condominio.js';
 import { booleano, exigirMiembro, iso } from './_comun.js';
 
-const Categoria = z.enum(['ruido', 'dano_area_comun', 'seguridad', 'limpieza', 'mascotas', 'estacionamiento', 'filtracion', 'electricidad', 'otro']);
-const MAX_FOTOS = 4;
+export const Categoria = z.enum(['ruido', 'dano_area_comun', 'seguridad', 'limpieza', 'mascotas', 'estacionamiento', 'filtracion', 'electricidad', 'otro']);
+export const MAX_FOTOS = 4;
 
 /** Re-codifica a JPEG sin metadatos (sharp no copia EXIF salvo que se pida con withMetadata). */
-async function limpiarFoto(a: ArchivoSubido): Promise<ArchivoSubido> {
+export async function limpiarFoto(a: ArchivoSubido): Promise<ArchivoSubido> {
   let datos: Buffer;
   try {
     datos = await sharp(a.datos, { failOn: 'error' }).rotate().resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
@@ -34,9 +34,11 @@ export default async function rutasReportes(app: FastifyInstance) {
   app.get('/c/:cid/reportes', async (req): Promise<Reporte[]> => {
     const { cid } = ParamsC.parse(req.params);
     const { filas, mios, fotos } = await bd(req, async (c) => ({
-      filas: (await c.query(`select r.*, p.nombre as autor_nombre from reportes r left join perfiles p on p.id = r.autor_id
+      filas: (await c.query(`select r.*, p.nombre as autor_nombre, etiqueta_unidad(u) as unidad_etq from reportes r
+                              left join perfiles p on p.id = r.autor_id left join unidades u on u.id = r.unidad_id
                               where r.condominio_id = $1 order by r.creado_en desc limit 300`, [cid])).rows,
-      mios: (await c.query(`select * from mis_reportes() where condominio_id = $1`, [cid])).rows,
+      mios: (await c.query(`select m.*, etiqueta_unidad(u) as unidad_etq from mis_reportes() m left join unidades u on u.id = m.unidad_id
+                             where m.condominio_id = $1`, [cid])).rows,
       fotos: (await c.query(`select * from reporte_fotos_visibles($1)`, [cid])).rows,
     }));
     const misIds = new Set(mios.map((r) => r.id as string));
@@ -49,6 +51,7 @@ export default async function rutasReportes(app: FastifyInstance) {
       anonimo: r.anonimo, autorNombre: r.anonimo ? null : (r.autor_nombre ?? null), visibilidad: r.visibilidad, estado: r.estado,
       fotos: (await Promise.all((fotosPor.get(r.id) ?? []).map((p) => urlFirmada(ctx, 'reportes', p)))).filter((u): u is string => !!u),
       creadoEn: iso(r.creado_en)!, esMio: misIds.has(r.id),
+      unidadId: r.unidad_id ?? null, unidad: r.unidad_etq ?? null,
     })));
     return lista.sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
   });
@@ -60,7 +63,8 @@ export default async function rutasReportes(app: FastifyInstance) {
     const d = z.object({
       categoria: Categoria, titulo: z.string().trim().min(3).max(120), descripcion: z.string().trim().min(3).max(3000),
       ubicacion: z.string().trim().max(150).optional(), visibilidad: z.enum(['presidencia', 'comunidad']).default('presidencia'),
-    }).parse(campos);
+      unidadId: Uuid.optional(),
+    }).parse({ ...campos, unidadId: campos.unidadId?.trim() || undefined });
     const anonimo = booleano(campos.anonimo);
     const brutas = archivos.fotos ?? [];
     if (brutas.length > MAX_FOTOS) throw new ErrorApi(400, `Máximo ${MAX_FOTOS} fotos por reporte`, 'invalido');
@@ -76,8 +80,8 @@ export default async function rutasReportes(app: FastifyInstance) {
     }
     const id = await bd(req, async (c) => {
       if (!anonimo) for (const [i, f] of fotos.entries()) await guardarArchivo(ctx, c, 'reportes', rutas[i], f);
-      const r = await c.query(`select crear_reporte($1, $2, $3, $4, $5, $6, $7, $8) as id`,
-        [cid, d.categoria, d.titulo, d.descripcion, d.ubicacion || null, anonimo, d.visibilidad, rutas]);
+      const r = await c.query(`select crear_reporte($1, $2, $3, $4, $5, $6, $7, $8, $9) as id`,
+        [cid, d.categoria, d.titulo, d.descripcion, d.ubicacion || null, anonimo, d.visibilidad, rutas, d.unidadId ?? null]);
       return r.rows[0].id as string;
     }).catch(async (e) => {
       // Si el reporte no se creó (límite diario, etc.), se eliminan las fotos anónimas ya guardadas.

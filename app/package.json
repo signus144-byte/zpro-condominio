@@ -1,7 +1,7 @@
 {
   "name": "zpro-condominio",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "type": "module",
   "description": "ZPro Condominio · administración de condominios para Presidencia y residentes (Technical Digital TD, C.A.)",
   "scripts": {

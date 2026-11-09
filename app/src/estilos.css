@@ -289,3 +289,22 @@ input[type=file] { font-size: 0.85rem; max-width: 100%; }
 button.acceso { border: none; text-align: left; font: inherit; cursor: pointer; }
 .acceso-error { background: var(--error-suave); color: var(--error); }
 .lista li.clicable { cursor: pointer; }
+
+/* ---------- v0.8: convivencia ---------- */
+.aviso-info { background: var(--info-suave); color: var(--texto); }
+.privacidad-anonima { display: flex; flex-direction: column; gap: 4px; }
+.privacidad-anonima p { margin: 0; font-size: 0.85rem; color: var(--texto-2); }
+.texto-anonimo { white-space: pre-wrap; margin: 6px 0; }
+.tarjeta.anonimo.no-leido { border-left: 5px solid var(--info); }
+.tarjeta.resaltada, .tarjeta.anonimo.resaltada { box-shadow: 0 0 0 2px var(--primario); }
+.hilo-anonimo { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.burbuja-anonima { background: var(--fondo); border: 1px solid var(--linea); border-radius: 12px; padding: 8px 12px; max-width: 88%; }
+.burbuja-anonima.mia { align-self: flex-end; background: var(--primario-suave); border-color: transparent; }
+.burbuja-anonima p { margin: 2px 0 0; white-space: pre-wrap; }
+.opcion-radio { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; cursor: pointer; }
+.opcion-radio > input[type=radio] { width: 22px; height: 22px; min-width: 0; margin: 1px 0 0; padding: 0; border: 0; accent-color: var(--primario); flex: none; }
+.opcion-radio > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.denuncia { border-top: 1px solid var(--linea); padding: 12px 0; display: flex; flex-direction: column; gap: 6px; }
+.denuncia select { padding: 8px; border-radius: 8px; border: 1px solid var(--linea); background: var(--superficie); color: var(--texto); }
+.convivencia-inicio .acceso span { font-size: 0.85rem; }
+.convivencia-inicio .acceso strong { font-size: 1.5rem; }
