@@ -10,6 +10,7 @@ import type {
   AlcanceCasas, AlcanceDifusion, Difusion, GrupoUnidades,
 } from './tipos';
 import type { DifusionEnviada } from './api';
+import { resumenCuenta, validarCamposCuenta } from '../bancos';
 import { crearChatDemo, etiquetaChat } from './demoChat';
 import { crearAlertaDemo } from './demoAlerta';
 import { aplicarUnidad, cargoConEstado, pagoConDestinos, reporteMensual as armarReporte, type PagoDemo } from './demoFinanzas';
@@ -45,12 +46,18 @@ const unidad = (uid: string) => unidades.find((u) => u.id === uid)!;
 
 // saldoInicial: saldo con el que se migró cada cuenta al empezar a usar la app.
 const saldoInicial: Record<string, number> = { 'c-bs': 60000, 'c-zelle': 2500, 'c-caja': 300, 'c-fondo': 1800 };
+// Datos de pago FICTICIOS (teléfono y RIF en ceros): solo para mostrar cómo se ve.
 const cuentas: CuentaFinanciera[] = [
-  { id: 'c-bs', nombre: 'Banco (Bs) · Pago Móvil', tipo: 'banco_bs', moneda: 'VES', datosPago: 'Pago Móvil · Banco 0102 · 0414-0000000 · J-00000000-0' },
-  { id: 'c-zelle', nombre: 'Zelle', tipo: 'zelle', moneda: 'USD', datosPago: 'condominio.demo@correo.com · Residencias Los Samanes' },
-  { id: 'c-caja', nombre: 'Caja en divisas', tipo: 'caja', moneda: 'USD', datosPago: 'Entregar al tesorero contra recibo firmado' },
+  { id: 'c-bs', nombre: 'Banco (Bs) · Pago Móvil', tipo: 'banco_bs', moneda: 'VES', datosPago: null,
+    bancoCodigo: '0102', titular: 'Residencias Los Samanes (demo)', documento: 'J000000000', telefono: '04140000000',
+    numeroCuenta: '01020000000000000000', correo: null, nota: null, qrUrl: null, actualizadoEn: null, actualizadoPor: null },
+  { id: 'c-zelle', nombre: 'Zelle', tipo: 'zelle', moneda: 'USD', datosPago: null, titular: 'Residencias Los Samanes (demo)',
+    correo: 'condominio.demo@correo.com', qrUrl: null, actualizadoEn: null, actualizadoPor: null },
+  { id: 'c-caja', nombre: 'Caja en divisas', tipo: 'caja', moneda: 'USD', datosPago: null, nota: 'Entregar al tesorero contra recibo firmado',
+    qrUrl: null, actualizadoEn: null, actualizadoPor: null },
   { id: 'c-fondo', nombre: 'Fondo de reserva', tipo: 'fondo_reserva', moneda: 'USD', datosPago: null },
 ];
+for (const c of cuentas) c.datosPago = resumenCuenta(c);
 
 // Tasas FICTICIAS solo para los datos de ejemplo de meses pasados (gastos y pagos ya hechos). La tasa de HOY es la
 // real: el teléfono la consulta al BCV y a DolarApi (tasaEnVivo.ts) y sin dos fuentes no deja pagar en bolívares.
@@ -403,6 +410,15 @@ function notificar(usuarios: string[], tipo: TipoNotificacion, titulo: string, c
     if (sesion?.usuarioId === usuarioId) for (const f of oyentes) f(sinUsuario(n));
   }
 }
+/** Igual que el disparador cuentas_datos_pago_cambio (0027): fecha del cambio y aviso a toda la junta menos a quien lo hizo. */
+function avisarCambioDatosPago(c: CuentaFinanciera, quienId: string, quien: string, cambios: string[]) {
+  c.actualizadoEn = new Date().toISOString();
+  c.actualizadoPor = quien;
+  const junta = [...new Set(miembrosDemo.filter((m) => m.activo && JUNTA_ROLES.includes(m.rol)).map((m) => m.usuarioId))];
+  notificar(junta.filter((u) => u !== quienId), 'datos_pago', 'Cambiaron los datos para pagar',
+    `${quien} cambió "${c.nombre}": ${cambios.join(', ')}. Revise que sean correctos: son los que usan los vecinos para pagar.`,
+    { pantalla: 'datos-pago', cuentaId: c.id });
+}
 function avisarPagoReportado(p: Pago, creadoEn?: string) {
   const casa = etqU(p.unidadId)!;
   notificar(usuariosFinanzas(), 'pago_reportado', `Pago por revisar: ${casa}`,
@@ -677,8 +693,53 @@ export const demoApi: Api = {
              : 'La junta desactivó el chat entre casas. Sus conversaciones quedan guardadas, pero ya no se pueden enviar mensajes. El chat con la junta sigue igual.',
       { pantalla: 'chat' });
   },
-  async cuentasDePago() { return cuentas.filter((c) => c.datosPago); },
-  async cuentasFinancieras() { return cuentas; },
+  async cuentasDePago() { return cuentas.filter((c) => c.datosPago || c.qrUrl).map((c) => ({ ...c })); },
+  async cuentasFinancieras() { return cuentas.map((c) => ({ ...c })); },
+  async crearCuenta(nombre, tipo) {
+    exigirFinanzas();
+    const c: CuentaFinanciera = { id: id(), nombre: nombre.trim(), tipo, moneda: tipo === 'banco_bs' ? 'VES' : 'USD', datosPago: null,
+                                  qrUrl: null, actualizadoEn: null, actualizadoPor: null };
+    cuentas.push(c);
+    return c.id;
+  },
+  async guardarCuenta(cid, d) {
+    const s = exigirFinanzas();
+    const c = cuentas.find((x) => x.id === cid);
+    if (!c) throw new Error('Cuenta no existe');
+    const v = validarCamposCuenta(d);
+    const nombres: Record<string, string> = { bancoCodigo: 'banco', titular: 'titular', documento: 'cédula o RIF', telefono: 'teléfono de Pago Móvil',
+                                              numeroCuenta: 'número de cuenta', correo: 'correo', nota: 'nota' };
+    const cambios: string[] = [];
+    for (const [k, nombre] of Object.entries(nombres)) {
+      const nuevo = (v as Record<string, string | null | undefined>)[k];
+      if (nuevo === undefined) continue;
+      const actual = (c as unknown as Record<string, string | null | undefined>)[k] ?? null;
+      if (nuevo !== actual) { (c as unknown as Record<string, unknown>)[k] = nuevo; cambios.push(nombre); }
+    }
+    if (d.nombre && d.nombre.trim() !== c.nombre) c.nombre = d.nombre.trim();
+    if (cambios.length) avisarCambioDatosPago(c, s.usuarioId, s.nombre, cambios);
+    c.datosPago = resumenCuenta(c);
+  },
+  async quitarCuenta(cid) {
+    exigirFinanzas();
+    const i = cuentas.findIndex((x) => x.id === cid);
+    if (i < 0 || cuentas[i].tipo === 'fondo_reserva') throw new Error('Esa cuenta no se puede quitar');
+    cuentas.splice(i, 1);
+  },
+  async subirQrCuenta(cid, imagen) {
+    const s = exigirFinanzas();
+    const c = cuentas.find((x) => x.id === cid);
+    if (!c) throw new Error('Cuenta no existe');
+    c.qrUrl = URL.createObjectURL(imagen);
+    avisarCambioDatosPago(c, s.usuarioId, s.nombre, ['QR del banco']);
+  },
+  async quitarQrCuenta(cid) {
+    const s = exigirFinanzas();
+    const c = cuentas.find((x) => x.id === cid);
+    if (!c?.qrUrl) return;
+    c.qrUrl = null;
+    avisarCambioDatosPago(c, s.usuarioId, s.nombre, ['QR del banco']);
+  },
   async tasaBcv(fecha) {
     await consultarFuentes();
     const t = tasaPara(fecha);
@@ -891,8 +952,8 @@ export const demoApi: Api = {
     }).sort((a, b) => b.periodo.localeCompare(a.periodo));
   },
   async datosPagoZentaPro() {
-    return { banco: 'Banco de demostración (ficticio)', titular: 'Technical Digital TD, C.A. (demo)', rif: 'J-00000000-0',
-             telefonoPagoMovil: '0000-0000000', cuenta: '0000-0000-00-0000000000' };
+    return { banco: 'Banco de Venezuela', bancoCodigo: '0102', titular: 'Technical Digital TD, C.A. (demo)', rif: 'J-00000000-0',
+             telefonoPagoMovil: '0414-0000000', cuenta: '0102-0000-00-0000000000' };
   },
   async reportarPagoZentaPro(fid, p) {
     exigirFinanzas();

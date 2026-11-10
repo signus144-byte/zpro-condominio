@@ -8,7 +8,7 @@ import type {
   AlertaVecinal, CercaniaUnidad, ConfigAlerta, EnlaceInvitacion, EstadoAlerta, InfoInvitacion, NuevaAlerta,
   ParticipanteAlerta, RespuestaAlerta,
   AlcanceDifusion, Difusion, GrupoUnidades, NuevaDifusion, NuevoGrupo, PreviaDifusion, UnidadAlcance,
-  CierreMes, CobroPartidaCasa, LecturaTasa, ReporteDelMes, ResultadoConfirmarTasa, TasaBcv,
+  CierreMes, CobroPartidaCasa, LecturaTasa, ReporteDelMes, ResultadoConfirmarTasa, TasaBcv, DatosCuentaPago, TipoCuenta,
   ConfigConvivencia, DenunciaAnonima, MensajeAnonimo, MorosoPublico, NuevoMensajeAnonimo,
 } from './tipos';
 
@@ -59,6 +59,12 @@ export interface Api {
   condominio(): Promise<Condominio>;
   cuentasDePago(): Promise<CuentaFinanciera[]>;             // las que tienen datos para pagar
   cuentasFinancieras(): Promise<CuentaFinanciera[]>;        // todas las activas (conciliación)
+  // v0.9 · Datos para pagar (junta con finanzas): banco, teléfono, cédula o RIF, cuenta, correo y el QR del banco.
+  crearCuenta(nombre: string, tipo: TipoCuenta): Promise<string>;
+  guardarCuenta(id: string, d: DatosCuentaPago): Promise<void>;
+  quitarCuenta(id: string): Promise<void>;
+  subirQrCuenta(id: string, imagen: Blob): Promise<void>;
+  quitarQrCuenta(id: string): Promise<void>;
   /** Tasa BCV que rige ese día (por defecto hoy). usdVes = null si no está confirmada por dos fuentes (ver motivo).
    *  Lanza error de red si no hay conexión: la app NUNCA usa una tasa guardada de otro día para cobrar. */
   tasaBcv(fecha?: string): Promise<TasaBcv>;

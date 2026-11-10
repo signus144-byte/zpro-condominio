@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, type Cargo, type EstadoCuenta, type MetodoPago, type Moneda } from '../../data';
 import { Campo, Cifra, Estado, Etiqueta, Tarjeta, Vacio, useCarga } from '../../components/ui';
 import { BloqueoTasa, LineaTasa, useTasaDelDia } from '../../components/tasa';
+import { DatosParaPagar, sirvePara } from '../../components/DatosParaPagar';
 import { ESTADO_PAGO, METODOS, TIPO_CARGO, bs, fecha, hoyLocal, mes, usd } from '../../formato';
 import { BotonSOS } from '../alerta/Alerta';
 
@@ -304,6 +305,9 @@ function FormPago({ grupos, cargoIds, totalUsd, alCambiar }: { grupos: GrupoDeud
   const [enviando, setEnviando] = useState(false);
   const necesitaRef = !['efectivo_usd', 'efectivo_bs'].includes(metodo);
   const cuentasMoneda = cuentas.datos?.filter((c) => c.moneda === moneda) ?? [];
+  // Las cuentas a las que se puede pagar con ese método (con sus datos para copiar); si ninguna, las de esa moneda.
+  const cuentasMetodo = cuentas.datos?.filter((c) => sirvePara(c, metodo)) ?? [];
+  const destinos = cuentasMetodo.length ? cuentasMetodo : cuentasMoneda;
   // El monto se llena solo con lo elegido (en Bs, a la tasa verificada de ese día) hasta que la persona lo cambie.
   useEffect(() => {
     if (!tocado) setMonto(montoSugerido && montoSugerido > 0 ? montoSugerido.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
@@ -328,7 +332,7 @@ function FormPago({ grupos, cargoIds, totalUsd, alCambiar }: { grupos: GrupoDeud
       }
       await api.reportarPago({
         unidadId: unidadId(), fechaPago, metodo, moneda, monto: montoN, referencia: referencia.trim() || undefined,
-        bancoOrigen: banco || undefined, cuentaDestinoId: cuentaDestino || cuentasMoneda[0]?.id, comprobante, cargoIds,
+        bancoOrigen: banco || undefined, cuentaDestinoId: cuentaDestino || destinos[0]?.id, comprobante, cargoIds,
       });
       ir('/r/cuenta');
     } catch (e) { setError((e as Error).message); } finally { setEnviando(false); }
@@ -345,15 +349,12 @@ function FormPago({ grupos, cargoIds, totalUsd, alCambiar }: { grupos: GrupoDeud
         ) : <p className="nota">Pago adelantado: quedará a favor para el próximo recibo.</p>}
       </Tarjeta>
 
-      <Tarjeta titulo="¿Cómo pagó?">
+      <Tarjeta titulo="¿Cómo va a pagar?">
         <div className="chips">
           {(['pago_movil', 'transferencia', 'zelle', 'efectivo_usd', 'efectivo_bs', 'usdt'] as MetodoPago[]).map((m) => (
-            <button type="button" key={m} className={`chip ${metodo === m ? 'chip-activo' : ''}`} onClick={() => { setMetodo(m); setTocado(false); }}>{METODOS[m]}</button>
+            <button type="button" key={m} className={`chip ${metodo === m ? 'chip-activo' : ''}`} onClick={() => { setMetodo(m); setTocado(false); setCuentaDestino(''); }}>{METODOS[m]}</button>
           ))}
         </div>
-        {cuentasMoneda.map((c) => (
-          <div key={c.id} className="datos-pago"><strong>{c.nombre}</strong><span>{c.datosPago}</span></div>
-        ))}
       </Tarjeta>
 
       {moneda === 'VES' && (
@@ -369,8 +370,21 @@ function FormPago({ grupos, cargoIds, totalUsd, alCambiar }: { grupos: GrupoDeud
         </Tarjeta>
       )}
 
+      <Tarjeta titulo={metodo.startsWith('efectivo') ? 'Entregue el efectivo' : 'Pague a'}>
+        <Estado cargando={cuentas.cargando} error={cuentas.error}>
+          {cuentasMetodo.length ? cuentasMetodo.map((c) => (
+            <DatosParaPagar key={c.id} cuenta={c} metodo={metodo} monto={moneda === 'USD' ? (totalUsd > 0 ? totalUsd : null) : montoSugerido} />
+          )) : (
+            <>
+              {cuentasMoneda.map((c) => c.datosPago && <div key={c.id} className="datos-pago"><strong>{c.nombre}</strong><span>{c.datosPago}</span></div>)}
+              {!cuentasMoneda.some((c) => c.datosPago) && <p className="nota">La junta aún no cargó los datos para pagar por {METODOS[metodo]}. Pídaselos a la junta por el chat.</p>}
+            </>
+          )}
+        </Estado>
+      </Tarjeta>
+
       {!bloqueado && (
-        <Tarjeta titulo="Datos del pago">
+        <Tarjeta titulo="Después de pagar, repórtelo">
           <Campo etiqueta={`Monto que pagó en ${moneda === 'USD' ? 'dólares' : 'bolívares'}`}
                  ayuda={equivUsd != null && montoN > 0 && totalUsd > 0
                    ? (equivUsd < totalUsd - 0.009 ? `Equivale a ${usd(equivUsd)}: es un abono; quedará pendiente ${usd(r2(totalUsd - equivUsd))}.`
@@ -390,10 +404,10 @@ function FormPago({ grupos, cargoIds, totalUsd, alCambiar }: { grupos: GrupoDeud
           {moneda === 'VES' && metodo !== 'efectivo_bs' && (
             <Campo etiqueta="Banco de origen"><input value={banco} onChange={(e) => setBanco(e.target.value)} placeholder="Banesco, Venezuela, Mercantil…" /></Campo>
           )}
-          {cuentasMoneda.length > 1 && (
-            <Campo etiqueta="Cuenta del condominio">
+          {destinos.length > 1 && (
+            <Campo etiqueta="¿A qué cuenta pagó?">
               <select value={cuentaDestino} onChange={(e) => setCuentaDestino(e.target.value)}>
-                {cuentasMoneda.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                {destinos.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
               </select>
             </Campo>
           )}

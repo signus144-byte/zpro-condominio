@@ -39,10 +39,26 @@ export type ModoMorosos = 'no' | 'casas' | 'casas_y_montos';
 export interface Unidad { id: string; bloque: string | null; numero: string; alicuota: number; propietario: string | null }
 export interface UnidadConSaldo extends Unidad { cargosUsd: number; pagadoUsd: number; saldoUsd: number }
 
+export type TipoCuenta = 'banco_bs' | 'banco_usd' | 'caja' | 'zelle' | 'usdt' | 'fondo_reserva';
 export interface CuentaFinanciera {
   id: string; nombre: string;
-  tipo: 'banco_bs' | 'banco_usd' | 'caja' | 'zelle' | 'usdt' | 'fondo_reserva';
-  moneda: Moneda; datosPago: string | null;
+  tipo: TipoCuenta;
+  moneda: Moneda;
+  /** Resumen en una línea (para recibos y PDF): se arma con los campos de abajo o es la nota libre. */
+  datosPago: string | null;
+  // Datos para pagar, por campos (0027). Vacíos si la junta aún no los cargó.
+  bancoCodigo?: string | null; titular?: string | null;
+  documento?: string | null;          // letra + números: V12345678, J301234567
+  telefono?: string | null;           // Pago Móvil, 11 dígitos: 04141234567
+  numeroCuenta?: string | null;       // 20 dígitos
+  correo?: string | null;             // Zelle
+  nota?: string | null;               // texto libre (p. ej. "Entregar al tesorero contra recibo")
+  qrUrl?: string | null;              // imagen del QR de cobro que generó la app del banco
+  actualizadoEn?: string | null; actualizadoPor?: string | null;
+}
+export interface DatosCuentaPago {
+  nombre?: string; bancoCodigo?: string | null; titular?: string | null; documento?: string | null; telefono?: string | null;
+  numeroCuenta?: string | null; correo?: string | null; nota?: string | null;
 }
 
 export type EstadoCargo = 'pagado' | 'parcial' | 'pendiente' | 'credito';
@@ -250,7 +266,7 @@ export interface FacturaZentaPro {
   estado: 'emitida' | 'pagada' | 'vencida' | 'anulada'; numeroControl: string | null; pagadaEn: string | null;
   pagoPorConfirmar: boolean;          // la junta reportó un pago que ZentaPro aún no confirma
 }
-export interface DatosPagoZentaPro { banco: string; titular: string; rif: string; telefonoPagoMovil: string; cuenta: string }
+export interface DatosPagoZentaPro { banco: string; titular: string; rif: string; telefonoPagoMovil: string; cuenta: string; bancoCodigo?: string }
 
 export interface ComentarioReporte { id: string; autor: string | null; esOficial: boolean; texto: string; creadoEn: string }
 
@@ -268,13 +284,13 @@ export type EventoTiempoReal =
 
 // ---------------- v0.4: notificaciones ----------------
 export type TipoNotificacion = 'pago_reportado' | 'pago_confirmado' | 'pago_rechazado' | 'pagos_pendientes' | 'chat_vecinos' | 'general'
-  | 'alerta' | 'alerta_cerrada' | 'solicitud_ingreso' | 'difusion' | 'cierre_mes' | 'tasa_bcv' | 'mensaje_anonimo' | 'denuncia_anonima';
+  | 'alerta' | 'alerta_cerrada' | 'solicitud_ingreso' | 'difusion' | 'cierre_mes' | 'tasa_bcv' | 'mensaje_anonimo' | 'denuncia_anonima' | 'datos_pago';
 export interface Notificacion {
   id: string; tipo: TipoNotificacion; condominioId: string | null;
   titulo: string; cuerpo: string;
   datos: { pagoId?: string; alertaId?: string; tipoAlerta?: TipoAlerta;
-           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos' | 'partidas' | 'avisos' | 'cierre' | 'tasa' | 'anonimos' | 'denuncias' | 'morosos'; pendientes?: number;
-           partidaId?: string; difusionId?: string; periodo?: string; mensajeId?: string };
+           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos' | 'partidas' | 'avisos' | 'cierre' | 'tasa' | 'anonimos' | 'denuncias' | 'morosos' | 'datos-pago'; pendientes?: number;
+           partidaId?: string; difusionId?: string; periodo?: string; mensajeId?: string; cuentaId?: string };
   leida: boolean; creadoEn: string;
 }
 export interface BandejaNotificaciones { noLeidas: number; notificaciones: Notificacion[] }

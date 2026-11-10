@@ -11,6 +11,7 @@ import { Directorio } from './screens/chat/Directorio';
 import { NuevaSala } from './screens/chat/NuevaSala';
 import { Marca } from './screens/presidencia/Marca';
 import { Mas } from './screens/presidencia/Mas';
+import { DatosPago } from './screens/presidencia/DatosPago';
 import { DocumentosPresidencia, DocumentosResidente } from './screens/Documentos';
 import { ElegirCondominio, Entrar, MiCuenta, OlvideClave, Registro, RestablecerClave, Unirme, VerificarCorreo } from './screens/cuenta/Cuenta';
 import { Accesos, AdminAvisos, Conciliacion, FacturaZentaPro, TasaBcv } from './screens/presidencia/Admin';
@@ -147,6 +148,7 @@ export default function App() {
         <Route path="/p/salas/nueva" element={<Protegida junta titulo="Nueva sala"><NuevaSala /></Protegida>} />
         <Route path="/p/documentos" element={<Protegida junta titulo="Documentos"><DocumentosPresidencia /></Protegida>} />
         <Route path="/p/marca" element={<Protegida junta titulo="Marca del condominio"><Marca /></Protegida>} />
+        <Route path="/p/datos-pago" element={<Protegida junta titulo="Datos para pagar"><DatosPago /></Protegida>} />
         <Route path="/p/mas" element={<Protegida junta titulo="Más opciones"><Mas /></Protegida>} />
         <Route path="/p/accesos" element={<Protegida junta titulo="Accesos de vecinos"><Accesos /></Protegida>} />
         <Route path="/p/conciliacion" element={<Protegida junta titulo="Conciliación bancaria"><Conciliacion /></Protegida>} />

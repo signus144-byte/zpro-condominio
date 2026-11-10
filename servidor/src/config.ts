@@ -31,8 +31,8 @@ const Esquema = z.object({
   SECRETOS_BANCOS: z.string().default('{}'),
   // Datos de la cuenta de ZentaPro donde las juntas pagan su mensualidad (JSON con DatosPagoZentaPro).
   DATOS_PAGO_ZENTAPRO: z.string().default(JSON.stringify({
-    banco: 'BANCO DE DEMOSTRACIÓN (ficticio)', titular: 'TECHNICAL DIGITAL TD, C.A. (DEMO)', rif: 'J-00000000-0',
-    telefonoPagoMovil: '0000-0000000', cuenta: '0000-0000-00-0000000000',
+    banco: 'Banco de Venezuela', bancoCodigo: '0102', titular: 'TECHNICAL DIGITAL TD, C.A. (DEMO)', rif: 'J-00000000-0',
+    telefonoPagoMovil: '0414-0000000', cuenta: '0102-0000-00-0000000000',
   })),
 });
 

@@ -340,7 +340,12 @@ export function crearApiServidor(base: string): Api {
 
     // ---- Comunes ----
     condominio: () => pedir<Condominio>('GET', c()),
-    async cuentasDePago() { return (await pedir<CuentaFinanciera[]>('GET', c('/cuentas'))).filter((x) => x.datosPago); },
+    async cuentasDePago() { return (await pedir<CuentaFinanciera[]>('GET', c('/cuentas'))).filter((x) => x.datosPago || x.qrUrl); },
+    async crearCuenta(nombre, tipo) { return (await pedir<{ id: string }>('POST', c('/cuentas'), { nombre, tipo })).id; },
+    async guardarCuenta(id, d) { await pedir('PUT', c(`/cuentas/${id}`), { ...d }); },
+    async quitarCuenta(id) { await pedir('DELETE', c(`/cuentas/${id}`)); },
+    async subirQrCuenta(id, imagen) { await pedir('PUT', c(`/cuentas/${id}/qr`), formulario({}, { qr: imagen })); },
+    async quitarQrCuenta(id) { await pedir('DELETE', c(`/cuentas/${id}/qr`)); },
     cuentasFinancieras: () => pedir<CuentaFinanciera[]>('GET', c('/cuentas')),
     tasaBcv: (fecha) => pedir<TasaBcv>('GET', `tasa-bcv${fecha ? `?fecha=${fecha}` : ''}`),
     fijarTasaBcv: (usdVes, fecha) => pedir<ResultadoConfirmarTasa>('POST', c('/tasa-bcv'), { usdVes, ...(fecha ? { fecha } : {}) }),

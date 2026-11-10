@@ -19,6 +19,7 @@ const OPCIONES = [
   { a: '/p/salas/nueva', t: 'Nueva sala o canal', d: 'Grupos por bloque o comisión, canal de avisos' },
   { a: '/p/documentos', t: 'Documentos', d: 'Estados de cuenta, solvencias, actas para firma y sello (PDF y Excel)' },
   { a: '/p/marca', t: 'Marca del condominio', d: 'Nombre de la asociación, logo y foto de la entrada' },
+  { a: '/p/datos-pago', t: 'Datos para pagar', d: 'Banco, Pago Móvil, cuenta y QR de cobro que ven los vecinos al pagar' },
   { a: '/p/tasa', t: 'Tasa BCV', d: 'Tasa del día comprobada con dos fuentes; confirmarla si una no responde' },
   { a: '/p/zentapro', t: 'Mensualidad del servicio', d: 'Factura de Technical Digital TD y reportar su pago' },
   { a: '/cuenta', t: 'Mi cuenta', d: 'Mis datos, cambiar clave, cambiar de condominio, salir' },

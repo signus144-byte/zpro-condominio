@@ -36,7 +36,11 @@ Base: `/api/v1`. JSON en camelCase. Los tipos de respuesta están en `compartido
 | PUT `c/:cid/chat-vecinos` | `{activo}` | 204 (presidente o administrador; queda en la bitácora y se avisa a todos) |
 | GET `c/:cid/marca` | — | `Marca` |
 | PATCH `c/:cid/marca` | multipart: campos de `Marca` + archivos `logo`, `fotoEntrada` | 204 |
-| GET `c/:cid/cuentas` | — | `CuentaFinanciera[]` |
+| GET `c/:cid/cuentas` | — | `CuentaFinanciera[]` (v0.9: `bancoCodigo, titular, documento, telefono, numeroCuenta, correo, nota, qrUrl, actualizadoEn, actualizadoPor`; `datosPago` es el resumen de una línea) |
+| POST `c/:cid/cuentas` | `{nombre, tipo}` (`banco_bs·banco_usd·caja·zelle·usdt`) | 201 `{id}` (finanzas) |
+| PUT `c/:cid/cuentas/:id` | `DatosCuentaPago` (campo ausente = no se toca; `null` o `''` = se borra) | 204 (finanzas). Se normaliza (sin guiones ni puntos) y valida con `compartido/bancos.ts`: banco de la lista, celular de 11 dígitos (acepta +58), cédula o RIF con letra V/E/J/G/P, cuenta de 20 dígitos que empiece por el código del banco, correo. Cada cambio avisa a **toda la junta menos a quien lo hizo** (`datos_pago`: quién y qué cambió) y sella `actualizadoEn/Por` |
+| PUT `c/:cid/cuentas/:id/qr` | multipart: `qr` (imagen) | 204 (finanzas). Se re-codifica en PNG; se avisa a la junta. La app ya lo envía leído y redibujado nítido desde la captura o la foto |
+| DELETE `c/:cid/cuentas/:id/qr` · DELETE `c/:cid/cuentas/:id` | — | 204 · 204 (la cuenta queda inactiva; el fondo de reserva no se quita → 400) |
 | GET `tasa-bcv?fecha=` | — | `TasaBcv` (v0.7): tasa que rige ese día (por defecto hoy en Caracas). `usdVes = null` si **no hay dos fuentes que coincidan** o no se comprobó vigente ese día; `motivo` lo explica |
 | POST `c/:cid/tasa-bcv` | `{usdVes, fecha?}` | `ResultadoConfirmarTasa` (junta con finanzas). La junta cuenta como **una** fuente; con otra que coincida queda verificada |
 | GET `c/:cid/tasa-bcv/lecturas` | — | `LecturaTasa[]`: qué dijo cada fuente en 24 h (junta) |

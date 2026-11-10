@@ -13,11 +13,13 @@ insert into unidades (id, condominio_id, bloque, numero, alicuota, propietario_n
   ('00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000c1', 'B', '33', 14, 'Elena Castro'),
   ('00000000-0000-0000-0000-0000000000b4', '00000000-0000-0000-0000-0000000000c1', 'B', '34', 14, 'Pedro Salas');
 
-insert into cuentas_financieras (condominio_id, nombre, tipo, moneda, datos_pago) values
-  ('00000000-0000-0000-0000-0000000000c1', 'Banco (Bs) · Pago Móvil', 'banco_bs', 'VES', 'Pago Móvil 0102 · 0414-0000000 · J-00000000-0'),
-  ('00000000-0000-0000-0000-0000000000c1', 'Zelle', 'zelle', 'USD', 'condominio.demo@correo.com'),
-  ('00000000-0000-0000-0000-0000000000c1', 'Caja en divisas', 'caja', 'USD', 'Entregar al tesorero con recibo'),
-  ('00000000-0000-0000-0000-0000000000c1', 'Fondo de reserva', 'fondo_reserva', 'USD', null);
+-- Datos de pago FICTICIOS (teléfono y RIF en ceros): solo para la demostración.
+insert into cuentas_financieras (condominio_id, nombre, tipo, moneda, datos_pago, banco_codigo, titular, documento, telefono, numero_cuenta, correo) values
+  ('00000000-0000-0000-0000-0000000000c1', 'Banco (Bs) · Pago Móvil', 'banco_bs', 'VES', null,
+   '0102', 'Residencias Los Samanes (demo)', 'J000000000', '04140000000', '01020000000000000000', null),
+  ('00000000-0000-0000-0000-0000000000c1', 'Zelle', 'zelle', 'USD', null, null, 'Residencias Los Samanes (demo)', null, null, null, 'condominio.demo@correo.com'),
+  ('00000000-0000-0000-0000-0000000000c1', 'Caja en divisas', 'caja', 'USD', 'Entregar al tesorero con recibo', null, null, null, null, null, null),
+  ('00000000-0000-0000-0000-0000000000c1', 'Fondo de reserva', 'fondo_reserva', 'USD', null, null, null, null, null, null, null);
 
 -- Tasas FICTICIAS de demostración (verificadas a mano para que los datos de ejemplo funcionen). En producción
 -- no existe esta semilla: las tasas solo entran verificadas por dos fuentes (ver 0022_tasa_verificada.sql).

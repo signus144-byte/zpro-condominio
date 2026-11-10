@@ -1,7 +1,9 @@
 // Administración de la junta: accesos (códigos, solicitudes, miembros), conciliación bancaria,
 // factura de ZentaPro, avisos y tasa BCV.
 import { useEffect, useMemo, useState } from 'react';
-import { api, type CodigoAcceso, type Rol } from '../../data';
+import { api, type CodigoAcceso, type CuentaFinanciera, type DatosPagoZentaPro, type Rol } from '../../data';
+import { DatosParaPagar } from '../../components/DatosParaPagar';
+import { BANCOS, digitos, normalizarDocumento, normalizarTelefono } from '../../bancos';
 import { Campo, Cifra, Estado, Etiqueta, Tarjeta, Vacio, useCarga } from '../../components/ui';
 import { bs, fecha, hace, hoyLocal, mes, usd, METODOS } from '../../formato';
 import { BloqueoTasa, LineaTasa, useTasaDelDia } from '../../components/tasa';
@@ -362,6 +364,18 @@ export function Conciliacion() {
 }
 
 // ============================ Factura de ZentaPro ============================
+/** Los datos de cobro de ZentaPro en la forma de una cuenta, para mostrarlos con los mismos botones «Copiar» y QR. */
+function cuentaZentaPro(d: DatosPagoZentaPro): CuentaFinanciera {
+  const nc = digitos(d.cuenta);
+  const codigo = d.bancoCodigo ?? (BANCOS.some((b) => b.codigo === nc.slice(0, 4)) ? nc.slice(0, 4) : null);
+  const telefono = normalizarTelefono(d.telefonoPagoMovil);
+  const documento = normalizarDocumento(d.rif);
+  return {
+    id: 'zentapro', nombre: d.titular, tipo: 'banco_bs', moneda: 'VES', titular: d.titular, bancoCodigo: codigo,
+    telefono, documento, numeroCuenta: nc.length === 20 ? nc : null,
+    datosPago: telefono && codigo && documento ? null : `${d.banco} · ${d.rif} · Pago Móvil ${d.telefonoPagoMovil} · Cuenta ${d.cuenta}`,
+  };
+}
 export function FacturaZentaPro() {
   const facturas = useCarga(() => api.facturasZentaPro());
   const datos = useCarga(() => api.datosPagoZentaPro());
@@ -418,12 +432,7 @@ export function FacturaZentaPro() {
         <Tarjeta titulo="Pagar en bolívares">
           <Estado cargando={datos.cargando} error={datos.error}>
             {datos.datos && (
-              <div className="datos-pago">
-                <strong>{datos.datos.titular}</strong>
-                <span>{datos.datos.banco} · RIF {datos.datos.rif}</span>
-                <span>Pago Móvil: {datos.datos.telefonoPagoMovil}</span>
-                <span>Cuenta: {datos.datos.cuenta}</span>
-              </div>
+              <DatosParaPagar cuenta={cuentaZentaPro(datos.datos)} metodo={metodo} monto={monto.trim() ? leerMontoVe(monto) : sugerido} titulo="Technical Digital TD (ZentaPro)" />
             )}
           </Estado>
           {enviado ? (
