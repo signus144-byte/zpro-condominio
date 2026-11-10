@@ -12,6 +12,13 @@ export async function recordarPagosPendientes(ctx: Contexto) {
   };
 }
 
+/** 8:10: a cada casa con saldo, 3 días antes del vencimiento y el día después (0029). */
+export async function recordarVencimientos(ctx: Contexto, hoy?: string) {
+  const filas = await comoServicio(ctx.pool, async (c) =>
+    (await c.query(hoy ? `select * from recordar_vencimientos($1::date)` : `select * from recordar_vencimientos()`, hoy ? [hoy] : [])).rows);
+  return { condominios: filas.length, avisos: filas.reduce((s, f) => s + Number(f.avisos), 0) };
+}
+
 /** Alertas vecinales olvidadas (más de 3 horas activas) se cierran solas como "vencida". */
 export async function vencerAlertas(ctx: Contexto, horas = 3) {
   return comoServicio(ctx.pool, async (c) => Number((await c.query(`select vencer_alertas($1) as n`, [horas])).rows[0].n));

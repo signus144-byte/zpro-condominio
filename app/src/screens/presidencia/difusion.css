@@ -35,7 +35,7 @@ label.alcance-modo > input[type=radio] { width: 22px; height: 22px; min-width: 0
 .previa { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--primario-suave); color: var(--primario); font-weight: 650; }
 .previa small { font-weight: 400; color: var(--texto-2); display: block; }
 .confirmar-envio { border: 2px solid var(--primario); }
-.btn.btn-whatsapp, a.btn-whatsapp { background: #128c4a; border-color: #128c4a; color: #fff; }
+.btn.btn-whatsapp, a.btn-whatsapp { background: #0e7a3f; border-color: #0e7a3f; color: #fff; }
 .difusiones li { flex-direction: column; align-items: stretch; gap: 2px; }
 .difusiones p { margin: 2px 0; font-size: 0.9rem; white-space: pre-line; }
 .grupo-casas { font-size: 0.85rem; color: var(--texto-2); }

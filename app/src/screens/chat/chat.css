@@ -28,7 +28,7 @@
 .burbuja-contador { background: var(--ok); color: #fff; border-radius: 999px; min-width: 20px; height: 20px; padding: 0 6px; font-size: 0.72rem; font-weight: 700; display: inline-grid; place-items: center; flex: none; }
 .avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 0.82rem; letter-spacing: -0.02em; color: #fff; background: #6b7c78; }
 .avatar-junta { background: var(--primario); color: var(--primario-txt); }
-.avatar-canal { background: var(--acento); }
+.avatar-canal { background: #8a5a00; }
 .avatar-grupo { background: #5a6fa6; }
 .avatar-casa { background: #7a6a55; }
 

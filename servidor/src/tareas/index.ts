@@ -4,12 +4,12 @@ import type { Contexto } from '../contexto.js';
 import { actualizarTasaBcv, hoyCaracas } from './tasa-bcv.js';
 import { purgarChat, purgarHuerfanos } from './purga.js';
 import { facturarMes, suspenderMorosos } from './facturacion.js';
-import { avisarTasaSinVerificar, cierreAutomatico, recordarPagosPendientes, vencerAlertas } from './recordatorios.js';
+import { avisarTasaSinVerificar, cierreAutomatico, recordarPagosPendientes, recordarVencimientos, vencerAlertas } from './recordatorios.js';
 
 export { actualizarTasaBcv, extraerDolarApi, extraerTasaBcv } from './tasa-bcv.js';
 export { purgarChat, purgarHuerfanos } from './purga.js';
 export { facturarMes, suspenderMorosos } from './facturacion.js';
-export { avisarTasaSinVerificar, cierreAutomatico, recordarPagosPendientes, vencerAlertas } from './recordatorios.js';
+export { avisarTasaSinVerificar, cierreAutomatico, recordarPagosPendientes, recordarVencimientos, vencerAlertas } from './recordatorios.js';
 
 type Log = { info: (o: unknown, m?: string) => void; error: (o: unknown, m?: string) => void };
 const consola: Log = { info: (o, m) => console.log(m ?? '', o), error: (o, m) => console.error(m ?? '', o) };
@@ -31,6 +31,7 @@ export function iniciarTareas(ctx: Contexto, log: Log = consola): { detener(): v
     tarea('facturacion', '0 6 1 * *', () => facturarMes(ctx, hoyCaracas())),   // día 1, 6:00
     tarea('suspension', '0 7 * * *', () => suspenderMorosos(ctx, 10)),         // 7:00
     tarea('recordatorio-pagos', '0 8 * * *', () => recordarPagosPendientes(ctx)), // 8:00: pagos sin aprobar/rechazar
+    tarea('recordatorio-vencimientos', '10 8 * * *', () => recordarVencimientos(ctx)), // 8:10: a las casas, antes y después de vencer
     tarea('vencer-alertas', '*/15 * * * *', () => vencerAlertas(ctx)),           // cada 15 min: alertas de más de 3 h
   ];
   // Al arrancar (o reiniciar) el servidor, la tasa se consulta de inmediato: no se espera a la próxima media hora.

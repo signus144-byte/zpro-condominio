@@ -1,5 +1,14 @@
 # Historial de versiones · Vecinos ZPro
 
+## 0.10 · 10-nov-2026 · Lectura del comprobante, recordatorios y análisis completo
+- **La app lee el comprobante**: al subir la captura del Pago Móvil o la transferencia (galería, cámara o pegándola), llena sola la referencia, el monto, la fecha y el banco de origen, y revisa que el pago haya ido a la cuenta del condominio (teléfono, cédula o RIF, cuenta, banco). Si fue a otra cuenta, lo advierte antes de enviar. La imagen se lee en el teléfono (Tesseract, dentro de la app; no se envía a terceros).
+- **La junta revisa el comprobante con un toque**: compara lo que dice la captura con lo que reportó el vecino y con las cuentas del condominio.
+- **Recordatorio de pago a cada casa**: 3 días antes de que venza su recibo y el día después, solo si tiene saldo y no ha reportado un pago. Encendido por defecto; la junta lo apaga en Transparencia y convivencia.
+- **Accesibilidad (WCAG 2 AA)**: corregidos los contrastes de la etiqueta DEMO, etiquetas grises, botón de WhatsApp, botón SOS en modo oscuro e íconos de canales; textos mínimos a 12 px; un selector sin nombre. 0 fallas en las 41 pantallas.
+- **Arranque más rápido**: las pantallas de uso ocasional se cargan al abrirlas (código inicial de 817 KB a 593 KB).
+- Corregido: si faltaba la tasa BCV de la fecha del comprobante, el formulario de reporte desaparecía.
+- 190 pruebas (178 de la API, 2 de reglas SQL, 10 del lector), todas pasan.
+
 ## 0.9 · 10-nov-2026 · Datos para pagar y cuentas del condominio opcionales
 - **Datos para pagar** (Más → Datos para pagar): la junta carga cada cuenta por campos: banco (lista de los 26 bancos), teléfono de Pago Móvil, cédula o RIF, número de cuenta, titular, correo de Zelle y una nota. La app los limpia (acepta "0414-123.45.67", "+58 414…", "V-12.345.678") y rechaza lo que haría fallar el pago (teléfono fijo, cuenta que no empieza por el código del banco…).
 - **El vecino copia dato por dato**: en Pagar, según cómo va a pagar (Pago Móvil, transferencia, Zelle, efectivo), ve cada dato con su botón **Copiar** para pegarlo en la app de su banco: banco, teléfono, cédula o RIF (solo los números), número de cuenta y **monto ya calculado a la tasa BCV, escrito como lo piden los bancos (55467,33)**. Botón **Copiar todo**.

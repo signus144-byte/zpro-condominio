@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { api } from './data';
 import { Marco, type ItemNav } from './components/ui';
@@ -8,26 +8,40 @@ import { NuevoReporte, Partidas, Reportes } from './screens/Compartidas';
 import { Chats } from './screens/chat/Chats';
 import { SalaChat } from './screens/chat/SalaChat';
 import { Directorio } from './screens/chat/Directorio';
-import { NuevaSala } from './screens/chat/NuevaSala';
-import { Marca } from './screens/presidencia/Marca';
 import { Mas } from './screens/presidencia/Mas';
-import { DatosPago } from './screens/presidencia/DatosPago';
-import { CuentasCondominio } from './screens/convivencia/Finanzas';
-import { DocumentosPresidencia, DocumentosResidente } from './screens/Documentos';
 import { ElegirCondominio, Entrar, MiCuenta, OlvideClave, Registro, RestablecerClave, Unirme, VerificarCorreo } from './screens/cuenta/Cuenta';
-import { Accesos, AdminAvisos, Conciliacion, FacturaZentaPro, TasaBcv } from './screens/presidencia/Admin';
 import { destino } from './navegacion';
 import { Notificaciones } from './components/notificaciones';
-import { GruposCasas, MensajesMasivos, NotificacionCompleta } from './screens/presidencia/Difusion';
-import { ChatVecinos } from './screens/presidencia/Admin';
 import { CapaAlarma, ConfigAlertaJunta, DetalleAlerta, HistorialAlertas, Participacion, Sos, UbicacionCasas } from './screens/alerta/Alerta';
-import { Invitar } from './screens/presidencia/Invitar';
-import { CierreMes } from './screens/presidencia/Cierre';
-import { ConvivenciaJunta, CuotasVencidas, MensajesAnonimos } from './screens/convivencia/Convivencia';
 import { Invitacion } from './screens/cuenta/Invitacion';
 import { SoloOtraApp } from './screens/cuenta/Cuenta';
 import { SABOR } from './sabor';
 import { escucharEnlaces, iniciarNativo } from './nativo';
+
+// Pantallas que se cargan al abrirlas (la app arranca más rápido en teléfonos sencillos).
+function perezosa<M extends Record<string, unknown>>(cargar: () => Promise<M>, nombre: keyof M) {
+  return lazy(async () => ({ default: (await cargar())[nombre] as ComponentType }));
+}
+const Marca = perezosa(() => import('./screens/presidencia/Marca'), 'Marca');
+const DatosPago = perezosa(() => import('./screens/presidencia/DatosPago'), 'DatosPago');
+const CuentasCondominio = perezosa(() => import('./screens/convivencia/Finanzas'), 'CuentasCondominio');
+const DocumentosPresidencia = perezosa(() => import('./screens/Documentos'), 'DocumentosPresidencia');
+const DocumentosResidente = perezosa(() => import('./screens/Documentos'), 'DocumentosResidente');
+const Accesos = perezosa(() => import('./screens/presidencia/Admin'), 'Accesos');
+const AdminAvisos = perezosa(() => import('./screens/presidencia/Admin'), 'AdminAvisos');
+const Conciliacion = perezosa(() => import('./screens/presidencia/Admin'), 'Conciliacion');
+const FacturaZentaPro = perezosa(() => import('./screens/presidencia/Admin'), 'FacturaZentaPro');
+const TasaBcv = perezosa(() => import('./screens/presidencia/Admin'), 'TasaBcv');
+const ChatVecinos = perezosa(() => import('./screens/presidencia/Admin'), 'ChatVecinos');
+const GruposCasas = perezosa(() => import('./screens/presidencia/Difusion'), 'GruposCasas');
+const MensajesMasivos = perezosa(() => import('./screens/presidencia/Difusion'), 'MensajesMasivos');
+const NotificacionCompleta = perezosa(() => import('./screens/presidencia/Difusion'), 'NotificacionCompleta');
+const Invitar = perezosa(() => import('./screens/presidencia/Invitar'), 'Invitar');
+const CierreMes = perezosa(() => import('./screens/presidencia/Cierre'), 'CierreMes');
+const ConvivenciaJunta = perezosa(() => import('./screens/convivencia/Convivencia'), 'ConvivenciaJunta');
+const CuotasVencidas = perezosa(() => import('./screens/convivencia/Convivencia'), 'CuotasVencidas');
+const MensajesAnonimos = perezosa(() => import('./screens/convivencia/Convivencia'), 'MensajesAnonimos');
+const NuevaSala = perezosa(() => import('./screens/chat/NuevaSala'), 'NuevaSala');
 
 const NAV_RESIDENTE: ItemNav[] = [
   { a: '/r', texto: 'Inicio', icono: 'inicio', fin: true },
@@ -107,6 +121,7 @@ export default function App() {
   return (
     <HashRouter>
       <CapaAlarma />
+      <Suspense fallback={<div className="cargando-pantalla" role="status">Cargando…</div>}>
       <Routes>
         <Route path="/entrar" element={<Entrar />} />
         <Route path="/registro" element={<Registro />} />
@@ -167,6 +182,7 @@ export default function App() {
         <Route path="/p/convivencia" element={<Protegida junta titulo="Transparencia y convivencia"><ConvivenciaJunta /></Protegida>} />
         <Route path="*" element={<Navigate to={destino()} replace />} />
       </Routes>
+      </Suspense>
     </HashRouter>
   );
 }

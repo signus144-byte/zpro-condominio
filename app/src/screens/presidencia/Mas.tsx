@@ -3,7 +3,7 @@ import '../chat/chat.css';
 
 const OPCIONES = [
   { a: '/p/cierre', t: 'Reporte y cierre del mes', d: 'Quién pagó y quién no, ingresos, gastos y saldos; PDF y Excel mes a mes' },
-  { a: '/p/convivencia', t: 'Transparencia y convivencia', d: 'Mostrar o no a los vecinos las cuentas del condominio y las casas con cuotas vencidas; mensajes anónimos y denuncias' },
+  { a: '/p/convivencia', t: 'Transparencia y convivencia', d: 'Cuentas del condominio para los vecinos, recordatorio de pago, casas con cuotas vencidas, mensajes anónimos y denuncias' },
   { a: '/p/mensajes', t: 'Mensajes masivos', d: 'Avisar a todo el condominio, a una calle, a un piso o a casas elegidas' },
   { a: '/p/grupos', t: 'Grupos de casas', d: 'Calles con portón, pisos con llave, torres: para cuotas y mensajes' },
   { a: '/p/invitar', t: 'Invitar vecinos', d: 'Enlace y código QR para que cada vecino pida entrar con Vecinos ZPro' },

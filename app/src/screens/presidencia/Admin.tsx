@@ -281,7 +281,7 @@ export function Conciliacion() {
           por referencia, monto y fecha, y confirma solos los que coinciden.</p>
         <Estado cargando={cuentas.cargando} error={cuentas.error}>
           <Campo etiqueta="Cuenta del condominio">
-            <select value={cuenta?.id ?? ''} onChange={(e) => setCuentaId(e.target.value)}>
+            <select aria-label="Cuenta del banco" value={cuenta?.id ?? ''} onChange={(e) => setCuentaId(e.target.value)}>
               {cuentasBanco.map((c) => <option key={c.id} value={c.id}>{c.nombre} ({c.moneda === 'VES' ? 'Bs' : '$'})</option>)}
             </select>
           </Campo>

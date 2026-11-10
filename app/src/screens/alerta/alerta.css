@@ -1,6 +1,6 @@
 /* Alerta vecinal: botón SOS, los cuatro botones grandes, la alarma a pantalla completa y el detalle. */
 :root { --sos: #d0111f; --sos-oscuro: #9b0b16; --sos-suave: #fde4e6; }
-@media (prefers-color-scheme: dark) { :root { --sos: #ef3340; --sos-oscuro: #b3121e; --sos-suave: #3b1417; } }
+@media (prefers-color-scheme: dark) { :root { --sos: #d42a36; --sos-oscuro: #b3121e; --sos-suave: #3b1417; } }
 
 .sos-boton {
   display: flex; align-items: center; gap: 14px; width: 100%; text-decoration: none; cursor: pointer;

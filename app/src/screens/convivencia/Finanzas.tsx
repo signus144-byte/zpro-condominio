@@ -134,3 +134,30 @@ export function OpcionFinanzas({ puede }: { puede: boolean }) {
     </Tarjeta>
   );
 }
+
+/** Junta: recordatorio amable a cada casa (3 días antes de vencer su recibo y el día después). */
+export function OpcionRecordatorio() {
+  const s = api.sesion()!;
+  const puede = ['presidente', 'administrador', 'tesorero'].includes(s.rol);
+  const cfg = useCarga(() => api.convivencia());
+  const [activo, setActivo] = useState<boolean | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  useEffect(() => { if (cfg.datos) setActivo(cfg.datos.recordatorioVencimiento ?? true); }, [cfg.datos]);
+  async function cambiar(v: boolean) {
+    setActivo(v); setMsg(null);
+    try { await api.fijarRecordatorioVencimiento(v); setMsg({ ok: true, t: v ? 'Encendido.' : 'Apagado: no se enviarán recordatorios.' }); }
+    catch (e) { setActivo(!v); setMsg({ ok: false, t: (e as Error).message }); }
+  }
+  if (activo == null) return null;
+  return (
+    <Tarjeta titulo="Recordatorio de pago">
+      <label className="interruptor">
+        <input type="checkbox" checked={activo} disabled={!puede} onChange={(e) => void cambiar(e.target.checked)} />
+        <span><strong>Recordarle a cada casa su recibo</strong>
+          <small>3 días antes de que venza y el día después, solo si tiene saldo pendiente. Le llega solo a esa casa, con su monto y un acceso directo a Pagar. Si ya reportó el pago, no se le molesta.</small></span>
+      </label>
+      {!puede && <p className="nota">Solo presidencia, tesorería o la administración cambia esta opción.</p>}
+      {msg && <div className={`aviso ${msg.ok ? 'aviso-ok' : 'aviso-error'}`}>{msg.t}</div>}
+    </Tarjeta>
+  );
+}

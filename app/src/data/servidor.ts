@@ -421,6 +421,7 @@ export function crearApiServidor(base: string): Api {
     async fijarConvivencia(k) { await pedir('PUT', c('/convivencia'), { ...k }); },
     finanzasPublicas: (periodo) => pedir<FinanzasPublicas | null>('GET', c(`/finanzas-publicas?periodo=${periodo}`)),
     async fijarFinanzasPublicas(modo) { await pedir('PUT', c('/finanzas-publicas'), { modo }); },
+    async fijarRecordatorioVencimiento(activo) { await pedir('PUT', c('/recordatorio-vencimiento'), { activo }); },
     morosos: (vistaPrevia) => pedir<MorosoPublico[]>('GET', c(`/morosos${vistaPrevia ? '?vistaPrevia=1' : ''}`)),
     mensajesAnonimos: () => pedir<MensajeAnonimo[]>('GET', c('/anonimos')),
     enviarMensajeAnonimo: (m) => pedir<{ id: string; reporteId: string | null }>('POST', c('/anonimos'), formulario({

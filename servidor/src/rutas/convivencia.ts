@@ -27,9 +27,10 @@ export default async function rutasConvivencia(app: FastifyInstance) {
     const { cid } = ParamsC.parse(req.params);
     return bd(req, async (c) => {
       await exigirMiembro(c, cid);
-      const k = (await c.query(`select morosos_publicos, morosos_meses_min, mensajes_anonimos, finanzas_publicas from condominios where id = $1`, [cid])).rows[0];
+      const k = (await c.query(`select morosos_publicos, morosos_meses_min, mensajes_anonimos, finanzas_publicas, recordatorio_vencimiento
+                                  from condominios where id = $1`, [cid])).rows[0];
       return { morososPublicos: k.morosos_publicos, morososMesesMin: num(k.morosos_meses_min), mensajesAnonimos: k.mensajes_anonimos,
-               finanzasPublicas: k.finanzas_publicas };
+               finanzasPublicas: k.finanzas_publicas, recordatorioVencimiento: k.recordatorio_vencimiento };
     });
   });
 
@@ -48,6 +49,12 @@ export default async function rutasConvivencia(app: FastifyInstance) {
     const { cid } = ParamsC.parse(req.params);
     const { modo } = z.object({ modo: z.enum(['no', 'totales', 'detalle']) }).parse(req.body);
     await bd(req, (c) => c.query(`select fijar_finanzas_publicas($1, $2)`, [cid, modo]));
+    return rep.status(204).send();
+  });
+  app.put('/c/:cid/recordatorio-vencimiento', async (req, rep) => {
+    const { cid } = ParamsC.parse(req.params);
+    const { activo } = z.object({ activo: z.boolean() }).parse(req.body);
+    await bd(req, (c) => c.query(`select fijar_recordatorio_vencimiento($1, $2)`, [cid, activo]));
     return rep.status(204).send();
   });
   // null = el condominio no publica sus números (los vecinos no ven nada). La junta siempre recibe la vista previa.

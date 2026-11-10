@@ -442,7 +442,7 @@ function avisarPagoRevisado(p: Pago) {
   }
 }
 // ---------- Transparencia y convivencia (0025_convivencia.sql) ----------
-const convivencia: ConfigConvivencia = { morososPublicos: 'no', morososMesesMin: 1, mensajesAnonimos: true, finanzasPublicas: 'no' };
+const convivencia: ConfigConvivencia = { morososPublicos: 'no', morososMesesMin: 1, mensajesAnonimos: true, finanzasPublicas: 'no', recordatorioVencimiento: true };
 interface AnonimoDemo extends Omit<MensajeAnonimo, 'direccion' | 'aUnidad'> {
   aUnidadId: string; autorId: string;              // autorId: solo para límites y suspensiones; NUNCA sale de aquí
   motivo: string | null;
@@ -1131,6 +1131,11 @@ export const demoApi: Api = {
         .map((p) => ({ titulo: p.titulo, presupuestoUsd: p.presupuestoUsd, emitidoUsd: p.emitidoUsd, cobradoUsd: p.cobradoUsd, estado: p.estado })),
       cuentas: modo === 'detalle' || s.esJunta ? d.cuentas.map((c) => ({ nombre: c.nombre, moneda: c.moneda, saldoFinal: c.saldoFinal })) : null,
     };
+  },
+  async fijarRecordatorioVencimiento(activo) {
+    const s = exigir();
+    if (!['presidente', 'administrador', 'tesorero'].includes(s.rol)) throw new Error('Solo presidencia, tesorería o la administración cambia esta opción');
+    convivencia.recordatorioVencimiento = activo;
   },
   async fijarFinanzasPublicas(modo) {
     const s = exigirPresidencia();

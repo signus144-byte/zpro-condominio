@@ -7,7 +7,7 @@ import { api, type ConfigConvivencia, type MensajeAnonimo, type ModoMorosos, typ
 import { Campo, Estado, Etiqueta, Tarjeta, Vacio, useCarga } from '../../components/ui';
 import { CATEGORIAS, hace, mes, usd } from '../../formato';
 import { BotonDoc, documentoMorosos } from '../Documentos';
-import { OpcionFinanzas } from './Finanzas';
+import { OpcionFinanzas, OpcionRecordatorio } from './Finanzas';
 
 const MESES = (n: number) => `${n} ${n === 1 ? 'mes' : 'meses'}`;
 
@@ -185,6 +185,7 @@ export function ConvivenciaJunta() {
   return (
     <>
       <OpcionFinanzas puede={puede} />
+      <OpcionRecordatorio />
       <Estado cargando={cfg.cargando} error={cfg.error}>
         {k && (
           <>

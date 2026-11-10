@@ -165,6 +165,8 @@ export interface Api {
   finanzasPublicas(periodo: string): Promise<FinanzasPublicas | null>;
   /** Presidencia o administración: qué números del condominio ven los vecinos. */
   fijarFinanzasPublicas(modo: ModoFinanzasPublicas): Promise<void>;
+  /** v0.10: recordatorio a cada casa antes y después del vencimiento (presidencia, tesorería o administración). */
+  fijarRecordatorioVencimiento(activo: boolean): Promise<void>;
   mensajesAnonimos(): Promise<MensajeAnonimo[]>;
   enviarMensajeAnonimo(m: NuevoMensajeAnonimo): Promise<{ id: string; reporteId: string | null }>;
   marcarAnonimoLeido(id: string): Promise<void>;

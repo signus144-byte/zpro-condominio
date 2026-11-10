@@ -286,12 +286,12 @@ export type EventoTiempoReal =
 
 // ---------------- v0.4: notificaciones ----------------
 export type TipoNotificacion = 'pago_reportado' | 'pago_confirmado' | 'pago_rechazado' | 'pagos_pendientes' | 'chat_vecinos' | 'general'
-  | 'alerta' | 'alerta_cerrada' | 'solicitud_ingreso' | 'difusion' | 'cierre_mes' | 'tasa_bcv' | 'mensaje_anonimo' | 'denuncia_anonima' | 'datos_pago';
+  | 'alerta' | 'alerta_cerrada' | 'solicitud_ingreso' | 'difusion' | 'cierre_mes' | 'tasa_bcv' | 'mensaje_anonimo' | 'denuncia_anonima' | 'datos_pago' | 'recordatorio_pago';
 export interface Notificacion {
   id: string; tipo: TipoNotificacion; condominioId: string | null;
   titulo: string; cuerpo: string;
   datos: { pagoId?: string; alertaId?: string; tipoAlerta?: TipoAlerta;
-           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos' | 'partidas' | 'avisos' | 'cierre' | 'tasa' | 'anonimos' | 'denuncias' | 'morosos' | 'datos-pago' | 'finanzas'; pendientes?: number;
+           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos' | 'partidas' | 'avisos' | 'cierre' | 'tasa' | 'anonimos' | 'denuncias' | 'morosos' | 'datos-pago' | 'finanzas' | 'pagar'; pendientes?: number;
            partidaId?: string; difusionId?: string; periodo?: string; mensajeId?: string; cuentaId?: string };
   leida: boolean; creadoEn: string;
 }
@@ -424,6 +424,8 @@ export interface ConfigConvivencia {
   morososPublicos: ModoMorosos; morososMesesMin: number; mensajesAnonimos: boolean;
   /** v0.9: qué números del condominio ven los vecinos (por defecto ninguno). */
   finanzasPublicas: ModoFinanzasPublicas;
+  /** v0.10: recordar a cada casa su recibo 3 días antes de vencer y el día después (encendido por defecto). */
+  recordatorioVencimiento: boolean;
 }
 /** 'no': nada (cada casa ve solo lo suyo) · 'totales': cobrado, gastado por categoría, fondo y cuotas especiales · 'detalle': además cada gasto y los saldos. */
 export type ModoFinanzasPublicas = 'no' | 'totales' | 'detalle';
