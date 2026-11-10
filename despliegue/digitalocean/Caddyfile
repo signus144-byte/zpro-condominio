@@ -7,6 +7,10 @@
   handle /verificar/* {
     reverse_proxy servidor:3000
   }
+  # "Conectar a un servidor" en el teléfono prueba GET /salud
+  handle /salud {
+    reverse_proxy servidor:3000
+  }
   handle {
     root * /srv/app
     try_files {path} /index.html
