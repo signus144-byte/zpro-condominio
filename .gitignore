@@ -29,4 +29,5 @@ app/android/app/src/miembros/assets/
 
 # Entregas y datos locales
 releases/
-archivos/
+/archivos/
+servidor/datos/
