@@ -20,7 +20,7 @@ function obtenerTrabajador(alAvanzar?: (p: number) => void) {
       const w = await createWorker('spa', OEM.LSTM_ONLY, {
         workerPath: base + 'worker.min.js',
         corePath: base + ((await soportaSimd()) ? 'tesseract-core-simd-lstm.wasm.js' : 'tesseract-core-lstm.wasm.js'),
-        langPath: base, gzip: true, cacheMethod: 'none',
+        langPath: base, gzip: false, cacheMethod: 'none',
         logger: (m: { status: string; progress: number }) => { if (m.status === 'recognizing text') alAvanzar?.(m.progress); },
       });
       await w.setParameters({ tessedit_pageseg_mode: PSM.AUTO, preserve_interword_spaces: '1', user_defined_dpi: '300' });
