@@ -20,7 +20,7 @@ export function Resumen() {
   return (
     <>
       <div className="titulo-pagina">
-        <div><h1>Resumen</h1><p>{mes(periodo)}{d.datos?.tasa && ` · Tasa BCV ${d.datos.tasa.usdVes.toLocaleString('es-VE')} Bs/$`}</p></div>
+        <div><h1>Resumen</h1><p>{mes(periodo)}{d.datos?.tasa?.usdVes != null ? ` · Tasa BCV ${d.datos.tasa.usdVes.toLocaleString('es-VE')} Bs/$` : ' · Tasa BCV sin confirmar'}</p></div>
         <Link className="btn" to="/alta">+ Alta de condominio</Link>
       </div>
       <Estado cargando={d.cargando} error={d.error}>

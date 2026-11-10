@@ -1,0 +1,18 @@
+{
+	admin off
+	auto_https off
+}
+# App (vecinos.<dominio>)
+:8080 {
+	encode gzip
+	root * /srv/app
+	try_files {path} /index.html
+	file_server
+}
+# Consola de Technical Digital TD (consola-vecinos.<dominio>)
+:8081 {
+	encode gzip
+	root * /srv/consola
+	try_files {path} /index.html
+	file_server
+}

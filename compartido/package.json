@@ -1,0 +1,6 @@
+{
+  "name": "zpro-compartido",
+  "private": true,
+  "type": "module",
+  "description": "Tipos y funciones que comparten la app, la consola y el servidor (se compila como módulo ES)"
+}

@@ -43,7 +43,7 @@ export function Facturacion() {
         <Cifra etiqueta="Facturado" valor={usd(total)} nota={`${fs.length} facturas`} />
         <Cifra etiqueta="Cobrado" valor={usd(cobrado)} tono="ok" nota={total ? `${Math.round((100 * cobrado) / total)} %` : undefined} />
         <Cifra etiqueta="Vencido" valor={usd(vencido)} tono={vencido ? 'error' : undefined} />
-        <Cifra etiqueta="Tasa BCV" valor={tasa.datos ? tasa.datos.usdVes.toLocaleString('es-VE') : '—'} nota={tasa.datos ? `Bs por dólar · ${fecha(tasa.datos.fecha)}` : 'Sin tasa cargada'} />
+        <Cifra etiqueta="Tasa BCV" valor={tasa.datos?.usdVes != null ? tasa.datos.usdVes.toLocaleString('es-VE') : '—'} nota={tasa.datos?.usdVes != null && tasa.datos.fecha ? `Bs por dólar · ${fecha(tasa.datos.fecha)}` : 'Sin tasa confirmada hoy'} />
       </div>
 
       <Tarjeta titulo={`Facturas de ${mes(periodo)}`} accion={

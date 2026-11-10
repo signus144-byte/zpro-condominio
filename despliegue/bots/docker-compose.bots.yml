@@ -1,0 +1,98 @@
+# Vecinos ZPro · PILOTO en el servidor compartido de los bots (junto a Alabanza y Viñas).
+# Límites estrictos para no quitarle nada a los bots: prioridad baja y tope de memoria por contenedor.
+# El HTTPS lo da el Caddy de Alabanza (red alabanza_default + /opt/caddy-sitios/vecinos.caddy).
+# La base de datos NO se publica a internet; el servidor solo escucha en la red interna (y 127.0.0.1:8092 para revisarlo).
+name: vecinos
+
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: vecinos-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zpro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_CLAVE:?falta POSTGRES_CLAVE}
+    # Ajustado para un servidor compartido: poca memoria fija, pocas conexiones.
+    command: >
+      postgres -c shared_buffers=48MB -c effective_cache_size=128MB -c work_mem=2MB
+               -c maintenance_work_mem=16MB -c max_connections=25 -c wal_buffers=2MB
+               -c max_worker_processes=2 -c max_parallel_workers=1 -c max_parallel_workers_per_gather=0
+    volumes:
+      - db:/var/lib/postgresql
+      - ./respaldos:/respaldos
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zpro"]
+      interval: 15s
+      retries: 20
+    mem_limit: 256m
+    memswap_limit: 384m
+    cpus: 0.75
+    cpu_shares: 256
+    pids_limit: 200
+    shm_size: 64m
+    security_opt: ["no-new-privileges:true"]
+    logging: { driver: json-file, options: { max-size: "5m", max-file: "2" } }
+
+  servidor:
+    build:
+      context: .
+      dockerfile: servidor.Dockerfile
+    container_name: vecinos-servidor
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PUERTO: "3000"
+      DATABASE_URL: postgres://zpro_api:${API_CLAVE_BD:?falta API_CLAVE_BD}@db:5432/zpro
+      DATABASE_ADMIN_URL: postgres://postgres:${POSTGRES_CLAVE}@db:5432/zpro
+      JWT_SECRETO: ${JWT_SECRETO:?falta JWT_SECRETO}
+      ARCHIVOS_DIR: /datos/archivos
+      URL_PUBLICA: https://${DOMINIO_APP}
+      URL_APP: https://${DOMINIO_APP}
+      CORS_ORIGENES: https://${DOMINIO_APP},https://${DOMINIO_CONSOLA},capacitor://localhost,https://localhost
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PUERTO: ${SMTP_PUERTO:-587}
+      SMTP_USUARIO: ${SMTP_USUARIO:-}
+      SMTP_CLAVE: ${SMTP_CLAVE:-}
+      CORREO_REMITENTE: ${CORREO_REMITENTE:-Vecinos ZPro <no-responder@zentapro.com>}
+      FCM_CUENTA_SERVICIO: ${FCM_CUENTA_SERVICIO:-}
+      DATOS_PAGO_ZENTAPRO: ${DATOS_PAGO_ZENTAPRO:-}
+      NODE_OPTIONS: --max-old-space-size=160
+    volumes:
+      - archivos:/datos/archivos
+    ports:
+      - "127.0.0.1:8092:3000"
+    networks: [default, caddy]
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 256m
+    memswap_limit: 384m
+    cpus: 0.75
+    cpu_shares: 256
+    pids_limit: 200
+    security_opt: ["no-new-privileges:true"]
+    logging: { driver: json-file, options: { max-size: "5m", max-file: "3" } }
+
+  web:
+    build:
+      context: .
+      dockerfile: web.Dockerfile
+    container_name: vecinos-web
+    restart: unless-stopped
+    networks: [caddy]
+    mem_limit: 48m
+    cpus: 0.25
+    cpu_shares: 128
+    pids_limit: 100
+    security_opt: ["no-new-privileges:true"]
+    logging: { driver: json-file, options: { max-size: "2m", max-file: "2" } }
+
+networks:
+  caddy:
+    external: true
+    name: alabanza_default
+
+volumes:
+  db:
+  archivos:

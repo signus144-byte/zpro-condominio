@@ -1,0 +1,56 @@
+# Prueba el PAQUETE del piloto (servidor de los bots) en Docker real, imitando el VPS: red y Caddy de Alabanza,
+# instalación desde cero, actualización encima (conserva datos y claves), HTTPS, consola, app y respaldo.
+# Se lanza a mano: Actions → "Probar paquete del piloto" → Run workflow.
+name: Probar paquete del piloto
+on: workflow_dispatch
+jobs:
+  piloto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Dependencias
+        run: |
+          (cd servidor && npm ci) && (cd app && npm ci) && (cd consola && npm ci)
+      - name: Armar el paquete (dominio de prueba localhost)
+        run: bash despliegue/bots/armar_paquete.sh localhost "$RUNNER_TEMP/vecinos-servidor.zip"
+      - name: Imitar el VPS (red y Caddy de Alabanza con carpeta de sitios)
+        run: |
+          docker network create alabanza_default
+          sudo mkdir -p /opt/caddy-sitios
+          printf '%s\n' '{' '	local_certs' '}' 'import /etc/caddy/sitios/*.caddy' > "$RUNNER_TEMP/Caddyfile"
+          echo '# vacío' | sudo tee /opt/caddy-sitios/00-leeme.caddy >/dev/null
+          docker run -d --name alabanza-caddy --network alabanza_default -p 80:80 -p 443:443 \
+            -v /opt/caddy-sitios:/etc/caddy/sitios:ro -v "$RUNNER_TEMP/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2
+      - name: Instalar desde cero
+        run: |
+          sudo mkdir -p /opt && cd /opt && sudo unzip -o -q "$RUNNER_TEMP/vecinos-servidor.zip"
+          sudo ADMIN_CORREO=admin@ci.prueba ADMIN_NOMBRE="Admin CI" bash /opt/vecinos/instalar-en-servidor.sh localhost | tee "$RUNNER_TEMP/instalar.log" | sed -E 's/(CLAVE_ADMIN: ).*/\1(oculta)/'
+          grep -q 'CLAVE_ADMIN: ' "$RUNNER_TEMP/instalar.log"
+      - name: Comprobar HTTPS, app, consola y entrar como administrador
+        run: |
+          CLAVE=$(grep -oP 'CLAVE_ADMIN: \K\S+' "$RUNNER_TEMP/instalar.log"); echo "::add-mask::$CLAVE"
+          curl -fsk https://vecinos.localhost/salud | tee /dev/stderr | grep -q '"ok":true'
+          curl -fsk https://vecinos.localhost/ | grep -q '<title>Vecinos ZPro'
+          curl -fsk https://vecinos.localhost/ocr/spa.traineddata -o /dev/null
+          curl -fsk https://consola-vecinos.localhost/ | grep -qi '<html'
+          curl -fsk -X POST https://vecinos.localhost/api/v1/auth/entrar -H 'content-type: application/json' \
+            -d "{\"correo\":\"admin@ci.prueba\",\"clave\":\"$CLAVE\"}" | grep -q acceso
+          echo "Base de datos NO expuesta:"; ! (ss -ltn | grep -q ':5432 ')
+      - name: Actualizar encima (conserva claves y datos)
+        run: |
+          sudo sha256sum /opt/vecinos/.env > "$RUNNER_TEMP/env-antes"
+          sudo bash /opt/vecinos/instalar-en-servidor.sh localhost > "$RUNNER_TEMP/actualizar.log"
+          sudo sha256sum /opt/vecinos/.env | diff - "$RUNNER_TEMP/env-antes"
+          CLAVE=$(grep -oP 'CLAVE_ADMIN: \K\S+' "$RUNNER_TEMP/instalar.log"); echo "::add-mask::$CLAVE"
+          curl -fsk -X POST https://vecinos.localhost/api/v1/auth/entrar -H 'content-type: application/json' \
+            -d "{\"correo\":\"admin@ci.prueba\",\"clave\":\"$CLAVE\"}" | grep -q acceso
+      - name: Respaldo nocturno (lo mismo que hace el cron)
+        run: |
+          test -f /etc/cron.d/vecinos-respaldo
+          sudo sh -c 'docker exec vecinos-db pg_dump -U postgres -Fc zpro > /opt/vecinos/respaldos/prueba.dump'
+          sudo test -s /opt/vecinos/respaldos/prueba.dump && sudo ls -la /opt/vecinos/respaldos
+      - name: Memoria usada
+        if: always()
+        run: docker stats --no-stream; docker ps -a; docker logs --tail 40 vecinos-servidor 2>&1 | cut -c1-200 || true

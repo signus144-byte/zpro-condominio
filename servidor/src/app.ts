@@ -1,4 +1,5 @@
 // Construye el servidor HTTP (Fastify). Las piezas externas (correo, almacén, hub) se inyectan para poder probar.
+import { readFileSync } from 'node:fs';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
@@ -60,7 +61,7 @@ export async function construirApp(cfg: Config, dep: Dependencias = {}): Promise
 
   app.get('/salud', async () => {
     await pool.query('select 1');
-    return { ok: true, version: '0.8.0' };
+    return { ok: true, version: VERSION };
   });
 
   await app.register(async (api) => {
@@ -72,3 +73,14 @@ export async function construirApp(cfg: Config, dep: Dependencias = {}): Promise
   app.addHook('onClose', async () => { tareas.detener(); await ctx.hub.cerrar(); await pool.end(); });
   return app;
 }
+
+/** Versión del servidor (package.json), tanto desde el código fuente como compilado en dist/. */
+const VERSION = (() => {
+  for (const r of ['../package.json', '../../../package.json']) {
+    try {
+      const j = JSON.parse(readFileSync(new URL(r, import.meta.url), 'utf8')) as { name?: string; version?: string };
+      if (j.name === 'zpro-condominio-servidor' && j.version) return j.version;
+    } catch { /* siguiente */ }
+  }
+  return 'desconocida';
+})();
