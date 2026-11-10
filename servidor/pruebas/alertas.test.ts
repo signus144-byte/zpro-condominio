@@ -42,7 +42,7 @@ describe('configuración y participación', () => {
   it('participar es voluntario: quien no se inscribe no puede emitir', async () => {
     const r = await P.pedir('POST', url('alertas'), noInscrito.acceso, { tipo: 'medica', verificacion: 'biometria' });
     assert.equal(r.status, 400);
-    assert.match(r.json.error, /Inscríbase/);
+    assert.match(r.json.error, /Inscríbase en la asistencia vecinal/);
   });
 
   it('cada vecino se inscribe con sus datos de ayuda (vehículo, salud, teléfono)', async () => {
@@ -191,7 +191,7 @@ describe('contra el abuso', () => {
     assert.equal((await P.pedir('PUT', url('alerta/red'), pres.acceso, { activa: false })).status, 204);
     const r = await P.pedir('POST', url('alertas'), b34.acceso, { tipo: 'seguridad', verificacion: 'biometria' });
     assert.equal(r.status, 400);
-    assert.match(r.json.error, /no ha activado/);
+    assert.match(r.json.error, /no ha activado la asistencia vecinal/);
     await P.pedir('PUT', url('alerta/red'), pres.acceso, { activa: true });
   });
 });

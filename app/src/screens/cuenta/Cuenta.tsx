@@ -118,7 +118,7 @@ export function SoloOtraApp({ cual }: { cual: 'junta' | 'miembros' }) {
       <div className="entrar-caja">
         <div className="aviso aviso-info">
           {cual === 'junta'
-            ? <>Su cuenta en <strong>{s?.condominio}</strong> es de residente. Para ver su estado de cuenta, pagar y la alerta vecinal use la app <strong>Vecinos ZPro</strong>.</>
+            ? <>Su cuenta en <strong>{s?.condominio}</strong> es de residente. Para ver su estado de cuenta, pagar y la asistencia vecinal use la app <strong>Vecinos ZPro</strong>.</>
             : <>Su cuenta en <strong>{s?.condominio}</strong> es de la junta y no tiene una casa asociada. Para administrar el condominio use la app <strong>Vecinos ZPro Junta</strong>.</>}
         </div>
         <Link className="btn btn-sec btn-ancho" to="/elegir">Elegir otro condominio</Link>
@@ -363,7 +363,7 @@ export function MiCuenta() {
         <div className="fila-botones">
           {(condos.size > 1 || (s?.esJunta && s.unidadId)) && <Link className="btn btn-sec" to="/elegir">Cambiar de condominio</Link>}
           {SABOR === 'completa' && s?.esJunta && s.unidadId && <Link className="btn btn-sec" to="/r">Ver como residente</Link>}
-          {s?.unidadId && <Link className="btn btn-sec" to={`${inicioDe(s).startsWith('/p') ? '/p' : '/r'}/alerta-vecinal`}>Alerta vecinal</Link>}
+          {s?.unidadId && <Link className="btn btn-sec" to={`${inicioDe(s).startsWith('/p') ? '/p' : '/r'}/alerta-vecinal`}>Asistencia vecinal</Link>}
           <Link className="btn btn-sec" to="/unirme">Unirme a otro condominio</Link>
         </div>
       </Tarjeta>

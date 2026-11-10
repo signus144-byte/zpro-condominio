@@ -47,7 +47,7 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Alerta vecinal: notificación con sonido de alarma y vibración -->
+    <!-- Asistencia vecinal: notificación con sonido de alarma y vibración -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />

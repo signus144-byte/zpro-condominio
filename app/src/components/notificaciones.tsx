@@ -59,7 +59,7 @@ export function Campana() {
     let t: ReturnType<typeof setTimeout> | null = null;
     const quitar = api.suscribirNotificaciones((n) => {
       setNoLeidas((x) => x + 1);
-      if (n.tipo === 'alerta') return;            // la alerta vecinal ya se muestra a pantalla completa
+      if (n.tipo === 'alerta') return;            // la asistencia vecinal ya se muestra a pantalla completa
       setEmergente(n);
       if (t) clearTimeout(t);
       t = setTimeout(() => setEmergente(null), 6000);

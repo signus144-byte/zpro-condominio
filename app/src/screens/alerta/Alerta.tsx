@@ -1,4 +1,4 @@
-// Alerta vecinal: botón SOS, emitir (4 botones grandes + huella/patrón o clave), alarma a pantalla completa,
+// Asistencia vecinal: botón SOS, emitir (4 botones grandes + huella/patrón o clave), alarma a pantalla completa,
 // detalle con las respuestas de los vecinos, participación voluntaria y configuración de la junta.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -41,12 +41,12 @@ export function BotonSOS() {
       {tieneCasa ? (
         <Link to={`${prefijo}/sos`} className="sos-boton" aria-label="SOS: pedir ayuda a los vecinos">
           <span className="sos-circulo" aria-hidden>SOS</span>
-          <span><strong>Alerta vecinal</strong><small>Pedir ayuda a sus vecinos y a la junta ante una emergencia</small></span>
+          <span><strong>Asistencia vecinal</strong><small>Pedir ayuda a sus vecinos y a la junta ante una emergencia</small></span>
         </Link>
       ) : (
         <div className="sos-junta">
           <span className="sos-circulo" aria-hidden>SOS</span>
-          <span><strong>Alerta vecinal activa</strong><small>La junta recibe todas las alertas de emergencia del condominio.</small></span>
+          <span><strong>Asistencia vecinal activa</strong><small>La junta recibe todas las alertas de emergencia del condominio.</small></span>
         </div>
       )}
       {datos.alertasActivas > 0 && (
@@ -56,7 +56,7 @@ export function BotonSOS() {
       )}
       <div className="sos-pie">
         <Link to={tieneCasa ? `${prefijo}/alerta-vecinal` : `${prefijo}/alertas`} className="btn-texto">
-          {tieneCasa ? (datos.participacion?.activo ? 'Participa en la alerta vecinal ✓' : 'Inscribirme para avisar y recibir alertas') : 'Ver alertas'}
+          {tieneCasa ? (datos.participacion?.activo ? 'Participa en la asistencia vecinal ✓' : 'Inscribirme para avisar y recibir alertas') : 'Ver alertas'}
         </Link>
         {api.simularAlertaVecino && (
           <button className="btn-texto" onClick={() => { setError(null); api.simularAlertaVecino!().catch((e: Error) => setError(e.message)); }}>
@@ -102,7 +102,7 @@ export function Sos() {
         <Tarjeta titulo="No puede enviar una alerta ahora">
           <p>{cfg.motivoNoPuede}</p>
           <div className="fila-botones">
-            {!cfg.participacion?.activo && <Link className="btn" to={`${prefijo}/alerta-vecinal`}>Inscribirme en la alerta vecinal</Link>}
+            {!cfg.participacion?.activo && <Link className="btn" to={`${prefijo}/alerta-vecinal`}>Inscribirme en la asistencia vecinal</Link>}
             <Link className="btn btn-sec" to={`${prefijo}/alertas`}>Ver alertas</Link>
           </div>
           <Llamar911 />
@@ -421,7 +421,7 @@ export function Participacion() {
     setOk(null); setErr(null); setGuardando(true);
     try {
       await api.fijarParticipacion({ ...d, telefono: d.telefono.trim() || null });
-      setOk(d.activo ? 'Listo: participa en la alerta vecinal.' : 'Ya no participa en la alerta vecinal.');
+      setOk(d.activo ? 'Listo: participa en la asistencia vecinal.' : 'Ya no participa en la asistencia vecinal.');
       recargar();
     } catch (e) { setErr((e as Error).message); } finally { setGuardando(false); }
   }
@@ -430,7 +430,7 @@ export function Participacion() {
     <Estado cargando={cargando} error={error}>
       {cfg && (
         <>
-          {!cfg.redActiva && <div className="aviso aviso-error">La junta todavía no activó la alerta vecinal en el condominio.</div>}
+          {!cfg.redActiva && <div className="aviso aviso-error">La junta todavía no activó la asistencia vecinal en el condominio.</div>}
           {cfg.participacion?.suspendidoHasta && cfg.participacion.suspendidoHasta > new Date().toISOString() && (
             <div className="aviso aviso-error">La junta suspendió su participación hasta el {new Date(cfg.participacion.suspendidoHasta).toLocaleDateString('es-VE')}
               {cfg.participacion.motivoSuspension ? `: ${cfg.participacion.motivoSuspension}` : ''}.</div>
@@ -447,7 +447,7 @@ export function Participacion() {
           <Tarjeta titulo="Mi participación">
             <label className="interruptor">
               <input type="checkbox" checked={d.activo} onChange={(e) => setD({ ...d, activo: e.target.checked })} />
-              <span><strong>Participar en la alerta vecinal</strong><small>Avisar y recibir avisos de emergencia.</small></span>
+              <span><strong>Participar en la asistencia vecinal</strong><small>Avisar y recibir avisos de emergencia.</small></span>
             </label>
             {d.activo && (
               <>
@@ -506,10 +506,10 @@ function Red({ cfg, alGuardar }: { cfg: ConfigAlerta; alGuardar: () => void }) {
   }
   const ej = 28;
   return (
-    <Tarjeta titulo="Alerta vecinal en el condominio">
+    <Tarjeta titulo="Asistencia vecinal en el condominio">
       <label className="interruptor">
         <input type="checkbox" checked={activa} disabled={!cfg.puedoConfigurar} onChange={(e) => setActiva(e.target.checked)} />
-        <span><strong>Activar la alerta vecinal</strong><small>Los residentes que se inscriban podrán pedir ayuda con el botón SOS. Al cambiarlo se avisa a todos.</small></span>
+        <span><strong>Activar la asistencia vecinal</strong><small>Los residentes que se inscriban podrán pedir ayuda con el botón SOS. Al cambiarlo se avisa a todos.</small></span>
       </label>
       <Campo etiqueta="Casas a cada lado que reciben la alerta" ayuda={radio === 0 ? 'Con 0, cada alerta suena en todo el condominio.'
         : `Con ${radio}: si avisa la casa ${ej}, suenan de la ${ej - radio} a la ${ej + radio} (del mismo bloque o calle). Incendio siempre avisa a todos.`}>
@@ -531,7 +531,7 @@ function Participantes({ puede }: { puede: boolean }) {
   const [err, setErr] = useState<string | null>(null);
   async function suspender(uid: string, dias: number) {
     setErr(null);
-    try { await api.suspenderDeAlerta(uid, dias, dias ? 'Uso indebido de la alerta vecinal' : undefined); recargar(); } catch (e) { setErr((e as Error).message); }
+    try { await api.suspenderDeAlerta(uid, dias, dias ? 'Uso indebido de la asistencia vecinal' : undefined); recargar(); } catch (e) { setErr((e as Error).message); }
   }
   const ahora = new Date().toISOString();
   return (

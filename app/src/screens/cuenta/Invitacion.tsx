@@ -51,7 +51,7 @@ export function Invitacion() {
         </div>
       ) : info && (
         <div className="entrar-caja formulario">
-          <p className="nota">Su junta de condominio lo invitó a <strong>{NOMBRE_APP}</strong>: estados de cuenta, pagos, avisos y alerta vecinal.</p>
+          <p className="nota">Su junta de condominio lo invitó a <strong>{NOMBRE_APP}</strong>: estados de cuenta, pagos, avisos y asistencia vecinal.</p>
           <Campo etiqueta="¿En qué casa o apartamento vive?">
             <select value={unidadId} onChange={(e) => setUnidadId(e.target.value)} required>
               <option value="">Elija…</option>

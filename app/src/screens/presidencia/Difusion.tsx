@@ -414,7 +414,7 @@ export function GruposCasas() {
       </Estado>
       {error && <div className="aviso aviso-error">{error}</div>}
       <Tarjeta titulo="Ubicación de las casas">
-        <p className="nota" style={{ margin: 0 }}>Calle o bloque, posición y piso de cada casa. Sirve para los filtros de arriba y para la alerta vecinal.</p>
+        <p className="nota" style={{ margin: 0 }}>Calle o bloque, posición y piso de cada casa. Sirve para los filtros de arriba y para la asistencia vecinal.</p>
         <Link className="btn btn-sec" to="/p/ubicacion">Editar ubicación</Link>
       </Tarjeta>
     </>

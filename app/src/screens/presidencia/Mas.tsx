@@ -8,7 +8,7 @@ const OPCIONES = [
   { a: '/p/grupos', t: 'Grupos de casas', d: 'Calles con portón, pisos con llave, torres: para cuotas y mensajes' },
   { a: '/p/invitar', t: 'Invitar vecinos', d: 'Enlace y código QR para que cada vecino pida entrar con Vecinos ZPro' },
   { a: '/p/accesos', t: 'Accesos de vecinos', d: 'Códigos por casa, solicitudes por aprobar, miembros y roles' },
-  { a: '/p/alerta', t: 'Alerta vecinal', d: 'Activar el botón SOS, casas a cada lado, vecinos inscritos y suspensiones' },
+  { a: '/p/alerta', t: 'Asistencia vecinal', d: 'Activar el botón SOS, casas a cada lado, vecinos inscritos y suspensiones' },
   { a: '/p/alertas', t: 'Historial de alertas', d: 'Emergencias recientes, quién respondió y cómo terminaron' },
   { a: '/p/conciliacion', t: 'Conciliación bancaria', d: 'Subir el movimiento del banco y confirmar pagos solos' },
   { a: '/p/avisos', t: 'Avisos', d: 'Publicar avisos para todos los residentes' },

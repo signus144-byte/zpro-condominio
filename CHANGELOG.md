@@ -1,5 +1,9 @@
 # Historial de versiones · Vecinos ZPro
 
+## 0.8.1 · 10-nov-2026 · "Asistencia vecinal"
+- El botón de emergencia ahora se llama **Asistencia vecinal** en las dos apps: tarjeta de inicio, pantalla SOS, historial, inscripción, configuración de la junta, canal de notificaciones de Android, avisos y mensajes de error. Cada aviso individual sigue llamándose "alerta" ("Enviar alerta", "alerta activa").
+- Contrato de servicio: el mismo nombre.
+
 ## 0.8 · 9-nov-2026 · Transparencia y convivencia sin represalias
 - **Lista de casas con cuotas vencidas, opcional**: la decide presidencia o la administración. Tres modos: no publicar (por defecto), publicar solo las casas (con los meses vencidos) o publicar casas y montos. Se puede exigir un mínimo de meses vencidos. **Nunca muestra nombres.** Al encenderla se avisa a todos los vecinos. PDF para la cartelera. Cuenta solo recibos ya vencidos y sin pagar; quien paga sale de la lista sola.
 - **Mensajes anónimos a otra casa**: "A una casa, sin mi nombre". Ej.: "El perrito hace pupú en la entrada; les agradecería recogerlo", con foto. La casa lo recibe y puede responder sin saber a quién; la conversación sigue anónima.

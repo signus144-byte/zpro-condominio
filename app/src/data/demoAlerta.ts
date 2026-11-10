@@ -1,4 +1,4 @@
-// Alerta vecinal y enlace de invitación en MODO DEMO: mismas reglas que 0019_alerta_vecinal.sql y 0020_enlace_invitacion.sql.
+// Asistencia vecinal y enlace de invitación en MODO DEMO: mismas reglas que 0019_alerta_vecinal.sql y 0020_enlace_invitacion.sql.
 import type { DatosParticipacion, EventoAlerta } from './api';
 import type {
   AlertaVecinal, CercaniaUnidad, ConfigAlerta, EnlaceInvitacion, EstadoAlerta, InfoInvitacion, NuevaAlerta, Notificacion,
@@ -86,9 +86,9 @@ export function crearAlertaDemo(k: ContextoAlertaDemo) {
   const avisar = (e: EventoAlerta) => { for (const f of oyentes) f(e); };
 
   function motivoNoEmitir(uid: string): string | null {
-    if (!red.activa) return 'La junta no ha activado la alerta vecinal';
+    if (!red.activa) return 'La junta no ha activado la asistencia vecinal';
     const p = participantes.get(uid);
-    if (!p || !p.activo) return 'Inscríbase en la alerta vecinal para poder avisar';
+    if (!p || !p.activo) return 'Inscríbase en la asistencia vecinal para poder avisar';
     if (p.suspendidoHasta && p.suspendidoHasta > new Date().toISOString()) {
       return `La junta suspendió su participación hasta el ${p.suspendidoHasta.slice(0, 10).split('-').reverse().join('/')}`;
     }
@@ -207,7 +207,7 @@ export function crearAlertaDemo(k: ContextoAlertaDemo) {
     },
     async fijarParticipacion(d: DatosParticipacion) {
       const s = yo();
-      if (!s.unidadId) throw new Error('Solo los residentes con casa registrada participan en la alerta vecinal');
+      if (!s.unidadId) throw new Error('Solo los residentes con casa registrada participan en la asistencia vecinal');
       const previo = participantes.get(s.usuarioId);
       participantes.set(s.usuarioId, { usuarioId: s.usuarioId, ...d, telefono: d.telefono?.trim() || null,
         suspendidoHasta: previo?.suspendidoHasta ?? null, motivoSuspension: previo?.motivoSuspension ?? null });
@@ -215,15 +215,15 @@ export function crearAlertaDemo(k: ContextoAlertaDemo) {
     },
     async configurarRedAlerta(activa: boolean, radio?: number) {
       const s = yo();
-      if (!puedeConfigurar(s)) throw new Error('Solo presidencia o la administración configura la alerta vecinal');
+      if (!puedeConfigurar(s)) throw new Error('Solo presidencia o la administración configura la asistencia vecinal');
       const cambio = red.activa !== activa;
       red.activa = activa;
       if (radio !== undefined) red.radio = Math.max(0, Math.min(50, Math.round(radio)));
       if (cambio) {
         k.notificar([...new Set(k.miembros().filter((m) => m.activo).map((m) => m.usuarioId))], 'general',
-          activa ? 'Alerta vecinal disponible' : 'Alerta vecinal desactivada',
-          activa ? 'La junta activó la alerta vecinal. Si quiere avisar o recibir avisos de emergencia de sus vecinos, inscríbase en Alerta vecinal.'
-                 : 'La junta desactivó la alerta vecinal en el condominio.', { pantalla: 'alerta' });
+          activa ? 'Asistencia vecinal disponible' : 'Asistencia vecinal desactivada',
+          activa ? 'La junta activó la asistencia vecinal. Si quiere avisar o recibir avisos de emergencia de sus vecinos, inscríbase en Asistencia vecinal.'
+                 : 'La junta desactivó la asistencia vecinal en el condominio.', { pantalla: 'alerta' });
       }
       await espera();
     },
@@ -241,7 +241,7 @@ export function crearAlertaDemo(k: ContextoAlertaDemo) {
       const s = yo();
       if (!puedeConfigurar(s)) throw new Error('Sin permiso');
       const p = participantes.get(uid);
-      if (!p) throw new Error('Esa persona no participa en la alerta vecinal');
+      if (!p) throw new Error('Esa persona no participa en la asistencia vecinal');
       p.suspendidoHasta = dias > 0 ? new Date(Date.now() + dias * 86_400_000).toISOString() : null;
       p.motivoSuspension = dias > 0 ? motivo?.trim() || null : null;
     },
@@ -330,8 +330,8 @@ export function crearAlertaDemo(k: ContextoAlertaDemo) {
       const emisor = s.usuarioId === 'usr-pedro' ? 'usr-rosa' : 'usr-pedro';
       const previa = alertas.find((a) => a.emisorId === emisor && a.estado === 'activa');
       if (previa) { previa.estado = 'cancelada'; previa.cerradaEn = new Date().toISOString(); }
-      if (!red.activa) throw new Error('La alerta vecinal está desactivada en el condominio');
-      if (!s.esJunta && !participanteActivo(s.usuarioId)) throw new Error('Inscríbase en la alerta vecinal para recibir los avisos de sus vecinos');
+      if (!red.activa) throw new Error('La asistencia vecinal está desactivada en el condominio');
+      if (!s.esJunta && !participanteActivo(s.usuarioId)) throw new Error('Inscríbase en la asistencia vecinal para recibir los avisos de sus vecinos');
       const tipos: TipoAlerta[] = ['seguridad', 'medica'];
       const tipo = tipos[alertas.length % 2];
       crear(emisor, tipo, tipo === 'seguridad' ? 'Hay una persona extraña saltando la reja del estacionamiento' : 'Mi mamá se cayó y no se puede levantar', 'biometria');

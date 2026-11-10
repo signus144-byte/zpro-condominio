@@ -7,11 +7,11 @@ import { PUSH_ACTIVO } from './sabor';
 export const esNativo = () => Capacitor.isNativePlatform();
 export const CANAL_ALARMA = 'alarma_vecinal';
 
-/** Crea el canal de notificaciones "Alerta vecinal" (sonido de alarma, máxima importancia) y, si hay Firebase, registra el push. */
+/** Crea el canal de notificaciones "Asistencia vecinal" (sonido de alarma, máxima importancia) y, si hay Firebase, registra el push. */
 export async function iniciarNativo() {
   if (!esNativo()) return;
   const canal = {
-    id: CANAL_ALARMA, name: 'Alerta vecinal', description: 'Emergencias de sus vecinos: suena como alarma',
+    id: CANAL_ALARMA, name: 'Asistencia vecinal', description: 'Emergencias de sus vecinos: suena como alarma',
     importance: 5 as const, visibility: 1 as const, sound: 'alarma', vibration: true, lights: true, lightColor: '#E11D2E',
   };
   try {
@@ -66,7 +66,7 @@ export async function confirmarIdentidad(motivo: string): Promise<'biometria' | 
   if (!disp.isAvailable) return 'no_disponible';
   try {
     await NativeBiometric.verifyIdentity({
-      reason: motivo, title: 'Confirme que es usted', subtitle: 'Alerta vecinal',
+      reason: motivo, title: 'Confirme que es usted', subtitle: 'Asistencia vecinal',
       description: 'Use su huella, rostro, patrón o PIN. Su nombre y su casa irán en la alerta.', useFallback: true,
       // Android: huella o rostro, y si no, el patrón/PIN/clave de bloqueo del teléfono.
       allowedBiometryTypes: [BiometryType.MULTIPLE, BiometryType.DEVICE_CREDENTIAL],

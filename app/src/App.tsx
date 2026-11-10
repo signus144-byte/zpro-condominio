@@ -61,14 +61,14 @@ function Protegida({ junta, titulo, children }: { junta: boolean; titulo: string
   return <Marco titulo={titulo} nav={junta ? NAV_PRESIDENCIA : NAV_RESIDENTE}>{children}</Marco>;
 }
 
-/** Pantallas de la alerta vecinal: en la sección del rol que se está viendo (/r residente, /p junta). */
+/** Pantallas de la asistencia vecinal: en la sección del rol que se está viendo (/r residente, /p junta). */
 function rutasAlerta(p: '/r' | '/p') {
   const junta = p === '/p';
   return [
-    <Route key={`${p}sos`} path={`${p}/sos`} element={<Protegida junta={junta} titulo="Alerta vecinal · SOS"><Sos /></Protegida>} />,
-    <Route key={`${p}al`} path={`${p}/alertas`} element={<Protegida junta={junta} titulo="Alertas vecinales"><HistorialAlertas /></Protegida>} />,
-    <Route key={`${p}ad`} path={`${p}/alertas/:id`} element={<Protegida junta={junta} titulo="Alerta vecinal"><DetalleAlerta /></Protegida>} />,
-    <Route key={`${p}av`} path={`${p}/alerta-vecinal`} element={<Protegida junta={junta} titulo="Alerta vecinal"><Participacion /></Protegida>} />,
+    <Route key={`${p}sos`} path={`${p}/sos`} element={<Protegida junta={junta} titulo="Asistencia vecinal · SOS"><Sos /></Protegida>} />,
+    <Route key={`${p}al`} path={`${p}/alertas`} element={<Protegida junta={junta} titulo="Historial de asistencia vecinal"><HistorialAlertas /></Protegida>} />,
+    <Route key={`${p}ad`} path={`${p}/alertas/:id`} element={<Protegida junta={junta} titulo="Asistencia vecinal"><DetalleAlerta /></Protegida>} />,
+    <Route key={`${p}av`} path={`${p}/alerta-vecinal`} element={<Protegida junta={junta} titulo="Asistencia vecinal"><Participacion /></Protegida>} />,
   ];
 }
 
@@ -119,7 +119,7 @@ export default function App() {
         <Route path="/solo-miembros" element={api.sesion() ? <SoloOtraApp cual="miembros" /> : <Navigate to="/entrar" replace />} />
         {rutasAlerta('/r')}
         {rutasAlerta('/p')}
-        <Route path="/p/alerta" element={<Protegida junta titulo="Alerta vecinal · configuración"><ConfigAlertaJunta /></Protegida>} />
+        <Route path="/p/alerta" element={<Protegida junta titulo="Asistencia vecinal · configuración"><ConfigAlertaJunta /></Protegida>} />
         <Route path="/p/invitar" element={<Protegida junta titulo="Invitar vecinos"><Invitar /></Protegida>} />
         <Route path="/r" element={<Protegida junta={false} titulo="Mi condominio"><InicioResidente /></Protegida>} />
         <Route path="/r/cuenta" element={<Protegida junta={false} titulo="Estado de cuenta"><EstadoCuentaResidente /></Protegida>} />
