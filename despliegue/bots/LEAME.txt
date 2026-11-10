@@ -1,0 +1,18 @@
+VECINOS ZPRO · PILOTO EN EL SERVIDOR DE LOS BOTS
+================================================
+Instalar (o actualizar):  doble clic en «INSTALAR EN SERVIDOR.bat»
+  1. Revisa el servidor sin cambiar nada (memoria, disco, Alabanza, bots).
+  2. Escriba S y Enter para instalar.
+  3. La primera vez pide el correo con el que va a entrar a la consola y le muestra su clave UNA sola vez: anótela.
+
+Revisar (no cambia nada):  doble clic en «REVISAR SERVIDOR.bat». Deja informe-servidor.txt para Claude.
+
+Direcciones:
+  App y API (para «Conectar a un servidor» en el teléfono):  https://vecinos.165-245-244-208.sslip.io
+  Consola de Technical Digital TD:                          https://consola-vecinos.165-245-244-208.sslip.io
+
+Qué queda en el servidor (/opt/vecinos):
+  - Base de datos, servidor y app web en Docker, con topes de memoria (en reposo usan unos 100 MB).
+  - Las claves se generan EN el servidor (archivo .env, solo root). No salen de ahí.
+  - Respaldo cada noche en /opt/vecinos/respaldos (14 días).
+  - El HTTPS lo da el Caddy de Alabanza. Los bots, Alabanza y Viñas no se tocan.
