@@ -126,7 +126,10 @@ describe('el vecino elige qué paga', () => {
 });
 
 describe('avance de las cuotas especiales', () => {
-  it('todos ven cuánto se ha recaudado; solo la junta ve quién pagó y quién no', async () => {
+  it('si el condominio publica sus números, todos ven cuánto se ha recaudado; solo la junta ve quién pagó y quién no', async () => {
+    assert.equal(((await P.pedir('GET', `c/${C}/partidas`, b31.acceso)).json as any[]).find((x) => x.id === partida).avance, null,
+                 'por defecto (0028) los vecinos no ven el avance');
+    assert.equal((await P.pedir('PUT', `c/${C}/finanzas-publicas`, pres.acceso, { modo: 'totales' })).status, 204);
     const lista = (await P.pedir('GET', `c/${C}/partidas`, b31.acceso)).json as any[];
     const p = lista.find((x) => x.id === partida);
     assert.deepEqual(p.avance, { emitidoUsd: 250, cobradoUsd: 55, pendienteUsd: 195, casas: 8, casasAlDia: 1, cuotasEmitidas: 1 });

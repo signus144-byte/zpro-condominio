@@ -27,7 +27,8 @@ export default async function rutasCondominio(app: FastifyInstance) {
     const c = una(await bd(req, async (t) => (await t.query(`select * from condominios where id = $1`, [cid])).rows), 'Condominio');
     return { id: c.id, nombre: c.nombre, rif: c.rif, direccion: c.direccion, fondoReservaPct: c.fondo_reserva_pct,
              diaVencimiento: c.dia_vencimiento, chatVecinos: Boolean(c.chat_vecinos),
-             morososPublicos: c.morosos_publicos, morososMesesMin: Number(c.morosos_meses_min), mensajesAnonimos: Boolean(c.mensajes_anonimos) };
+             morososPublicos: c.morosos_publicos, morososMesesMin: Number(c.morosos_meses_min), mensajesAnonimos: Boolean(c.mensajes_anonimos),
+             finanzasPublicas: c.finanzas_publicas };
   });
 
   // La junta decide si los vecinos pueden escribirse casa ↔ casa (presidencia o administración).

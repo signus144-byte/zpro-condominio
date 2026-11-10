@@ -9,7 +9,7 @@ import type {
   ParticipanteAlerta, RespuestaAlerta,
   AlcanceDifusion, Difusion, GrupoUnidades, NuevaDifusion, NuevoGrupo, PreviaDifusion, UnidadAlcance,
   CierreMes, CobroPartidaCasa, LecturaTasa, ReporteDelMes, ResultadoConfirmarTasa, TasaBcv, DatosCuentaPago, TipoCuenta,
-  ConfigConvivencia, DenunciaAnonima, MensajeAnonimo, MorosoPublico, NuevoMensajeAnonimo,
+  ConfigConvivencia, DenunciaAnonima, MensajeAnonimo, MorosoPublico, NuevoMensajeAnonimo, FinanzasPublicas, ModoFinanzasPublicas,
 } from './tipos';
 
 /** Resultado de un mensaje masivo. */
@@ -161,6 +161,10 @@ export interface Api {
   fijarConvivencia(c: ConfigConvivencia): Promise<void>;
   /** Casas con cuotas vencidas (sin nombres). vistaPrevia: la junta la ve aunque esté apagada. */
   morosos(vistaPrevia?: boolean): Promise<MorosoPublico[]>;
+  /** v0.9: números del mes para los vecinos (sin nada por casa). null si el condominio no los publica; la junta siempre los ve. */
+  finanzasPublicas(periodo: string): Promise<FinanzasPublicas | null>;
+  /** Presidencia o administración: qué números del condominio ven los vecinos. */
+  fijarFinanzasPublicas(modo: ModoFinanzasPublicas): Promise<void>;
   mensajesAnonimos(): Promise<MensajeAnonimo[]>;
   enviarMensajeAnonimo(m: NuevoMensajeAnonimo): Promise<{ id: string; reporteId: string | null }>;
   marcarAnonimoLeido(id: string): Promise<void>;

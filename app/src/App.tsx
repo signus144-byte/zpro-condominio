@@ -12,6 +12,7 @@ import { NuevaSala } from './screens/chat/NuevaSala';
 import { Marca } from './screens/presidencia/Marca';
 import { Mas } from './screens/presidencia/Mas';
 import { DatosPago } from './screens/presidencia/DatosPago';
+import { CuentasCondominio } from './screens/convivencia/Finanzas';
 import { DocumentosPresidencia, DocumentosResidente } from './screens/Documentos';
 import { ElegirCondominio, Entrar, MiCuenta, OlvideClave, Registro, RestablecerClave, Unirme, VerificarCorreo } from './screens/cuenta/Cuenta';
 import { Accesos, AdminAvisos, Conciliacion, FacturaZentaPro, TasaBcv } from './screens/presidencia/Admin';
@@ -135,6 +136,7 @@ export default function App() {
         <Route path="/r/notificacion/:id" element={<Protegida junta={false} titulo="Mensaje"><NotificacionCompleta /></Protegida>} />
         <Route path="/r/documentos" element={<Protegida junta={false} titulo="Documentos"><DocumentosResidente /></Protegida>} />
         <Route path="/r/anonimos" element={<Protegida junta={false} titulo="Mensajes anónimos"><MensajesAnonimos /></Protegida>} />
+        <Route path="/r/finanzas" element={<Protegida junta={false} titulo="Cuentas del condominio"><CuentasCondominio /></Protegida>} />
         <Route path="/r/morosos" element={<Protegida junta={false} titulo="Cuotas vencidas"><CuotasVencidas /></Protegida>} />
         <Route path="/p" element={<Protegida junta titulo="Panel financiero"><Panel /></Protegida>} />
         <Route path="/p/pagos" element={<Protegida junta titulo="Pagos"><PagosPresidencia /></Protegida>} />

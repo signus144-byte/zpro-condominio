@@ -33,6 +33,8 @@ export interface Condominio {
   morososPublicos?: ModoMorosos; morososMesesMin?: number;
   /** v0.8: los vecinos pueden enviar mensajes anónimos a otra casa (encendido por defecto). */
   mensajesAnonimos?: boolean;
+  /** v0.9: qué números del condominio ven los vecinos ('no' por defecto). */
+  finanzasPublicas?: ModoFinanzasPublicas;
 }
 export type ModoMorosos = 'no' | 'casas' | 'casas_y_montos';
 
@@ -289,7 +291,7 @@ export interface Notificacion {
   id: string; tipo: TipoNotificacion; condominioId: string | null;
   titulo: string; cuerpo: string;
   datos: { pagoId?: string; alertaId?: string; tipoAlerta?: TipoAlerta;
-           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos' | 'partidas' | 'avisos' | 'cierre' | 'tasa' | 'anonimos' | 'denuncias' | 'morosos' | 'datos-pago'; pendientes?: number;
+           pantalla?: 'pagos' | 'estado-cuenta' | 'chat' | 'alerta' | 'accesos' | 'partidas' | 'avisos' | 'cierre' | 'tasa' | 'anonimos' | 'denuncias' | 'morosos' | 'datos-pago' | 'finanzas'; pendientes?: number;
            partidaId?: string; difusionId?: string; periodo?: string; mensajeId?: string; cuentaId?: string };
   leida: boolean; creadoEn: string;
 }
@@ -418,7 +420,23 @@ export interface CierreMes { periodo: string; cerradoEn: string; automatico: boo
 // ---------------- v0.8: transparencia y convivencia ----------------
 /** Casa con cuotas vencidas en la lista pública (nunca lleva nombres). montoVencidoUsd = null si la junta no publica montos. */
 export interface MorosoPublico { unidadId: string; etiqueta: string; mesesVencidos: number; montoVencidoUsd: number | null; desde: string }
-export interface ConfigConvivencia { morososPublicos: ModoMorosos; morososMesesMin: number; mensajesAnonimos: boolean }
+export interface ConfigConvivencia {
+  morososPublicos: ModoMorosos; morososMesesMin: number; mensajesAnonimos: boolean;
+  /** v0.9: qué números del condominio ven los vecinos (por defecto ninguno). */
+  finanzasPublicas: ModoFinanzasPublicas;
+}
+/** 'no': nada (cada casa ve solo lo suyo) · 'totales': cobrado, gastado por categoría, fondo y cuotas especiales · 'detalle': además cada gasto y los saldos. */
+export type ModoFinanzasPublicas = 'no' | 'totales' | 'detalle';
+/** Números del mes para los vecinos (sin nada por casa). */
+export interface FinanzasPublicas {
+  modo: ModoFinanzasPublicas; periodo: string; cerrado: boolean;
+  cobradoUsd: number; facturadoUsd: number; gastosUsd: number;
+  gastosPorCategoria: { categoria: string; montoUsd: number }[];
+  fondoReservaUsd: number;
+  partidas: { titulo: string; presupuestoUsd: number; emitidoUsd: number; cobradoUsd: number; estado: EstadoPartida }[];
+  /** Solo con 'detalle' (y para la junta). */
+  cuentas: { nombre: string; moneda: Moneda; saldoFinal: number }[] | null;
+}
 
 export interface RespuestaAnonima { id: string; de: 'casa' | 'remitente'; texto: string; creadoEn: string }
 /** Mensaje anónimo a una casa. Nunca trae quién lo envió. */

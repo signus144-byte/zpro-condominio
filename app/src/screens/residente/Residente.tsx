@@ -120,6 +120,7 @@ export function InicioResidente() {
       </Tarjeta>
 
       <div className="fila-botones">
+        {condo.datos?.finanzasPublicas && condo.datos.finanzasPublicas !== 'no' && <Link className="btn btn-sec" to="/r/finanzas">Cuentas del condominio</Link>}
         <Link className="btn btn-sec" to="/r/documentos">Documentos y solvencia</Link>
       </div>
 

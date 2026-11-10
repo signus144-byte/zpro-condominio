@@ -272,7 +272,7 @@ function vistaPartida(p: Partida): Partida {
     alcance: { tipo: incluidas.has(p.id) ? 'unidades' : 'todos', nombre: incluidas.has(p.id) ? p.alcance.nombre : null, unidades: casas.length },
     meAfecta: !!u,
     cuotaMiUnidadUsd: u ? cuotaDe(p, u) : null,
-    avance: avanceDe(p.id),
+    avance: s?.esJunta || convivencia.finanzasPublicas !== 'no' ? avanceDe(p.id) : null,   // 0028
     ...(s?.esJunta ? { unidadIds: [...casas] } : {}),
     votacion: v && {
       ...v,
@@ -442,7 +442,7 @@ function avisarPagoRevisado(p: Pago) {
   }
 }
 // ---------- Transparencia y convivencia (0025_convivencia.sql) ----------
-const convivencia: ConfigConvivencia = { morososPublicos: 'no', morososMesesMin: 1, mensajesAnonimos: true };
+const convivencia: ConfigConvivencia = { morososPublicos: 'no', morososMesesMin: 1, mensajesAnonimos: true, finanzasPublicas: 'no' };
 interface AnonimoDemo extends Omit<MensajeAnonimo, 'direccion' | 'aUnidad'> {
   aUnidadId: string; autorId: string;              // autorId: solo para límites y suspensiones; NUNCA sale de aquí
   motivo: string | null;
@@ -853,7 +853,11 @@ export const demoApi: Api = {
     p.estado = 'rechazado'; p.motivoRechazo = motivo;
     avisarPagoRevisado(p);
   },
-  async gastos(periodo) { exigir(); return gastos.filter((g) => g.periodo === periodo); },
+  async gastos(periodo) {
+    const s = exigir();
+    if (!s.esJunta && convivencia.finanzasPublicas !== 'detalle') return [];   // 0028: cada gasto solo si se publica el detalle
+    return gastos.filter((g) => g.periodo === periodo);
+  },
   async registrarGasto(g) {
     exigirFinanzas();
     if (g.moneda === 'VES' && !g.tasaBcv) throw new Error('Indique la tasa BCV');
@@ -1111,10 +1115,43 @@ export const demoApi: Api = {
 
   // ---- Transparencia y convivencia ----
   async convivencia() { exigir(); return { ...convivencia }; },
+  async finanzasPublicas(periodo) {
+    const s = exigir(); await espera();
+    const modo = convivencia.finanzasPublicas;
+    if (modo === 'no' && !s.esJunta) return null;
+    const d = cierresDemo.get(periodo)?.datos ?? reporteDe(periodo);
+    const cats = new Map<string, number>();
+    for (const g of d.gastos) cats.set(g.categoria, (cats.get(g.categoria) ?? 0) + g.montoUsd);
+    return {
+      modo, periodo, cerrado: cierresDemo.has(periodo),
+      cobradoUsd: d.resumen.cobradoUsd, facturadoUsd: d.resumen.facturadoUsd, gastosUsd: d.resumen.gastosUsd,
+      gastosPorCategoria: [...cats].map(([categoria, m]) => ({ categoria, montoUsd: Math.round(m * 100) / 100 })).sort((a, b) => b.montoUsd - a.montoUsd),
+      fondoReservaUsd: d.fondoReserva.cobradoAcumUsd,
+      partidas: d.partidas.filter((p) => { const x = partidas.find((y) => y.id === p.id); return !!x && (s.esJunta || !incluidas.has(x.id) || meIncluye(x, s.unidadId)); })
+        .map((p) => ({ titulo: p.titulo, presupuestoUsd: p.presupuestoUsd, emitidoUsd: p.emitidoUsd, cobradoUsd: p.cobradoUsd, estado: p.estado })),
+      cuentas: modo === 'detalle' || s.esJunta ? d.cuentas.map((c) => ({ nombre: c.nombre, moneda: c.moneda, saldoFinal: c.saldoFinal })) : null,
+    };
+  },
+  async fijarFinanzasPublicas(modo) {
+    const s = exigirPresidencia();
+    const antes = convivencia.finanzasPublicas;
+    if (antes === modo) return;
+    convivencia.finanzasPublicas = modo;
+    if (modo !== 'no') {
+      notificar(todosLosMiembros(), 'general', 'Cuentas del condominio', modo === 'detalle'
+        ? 'La junta publicó las cuentas del condominio: cuánto entró, cuánto se gastó (cada gasto con su factura) y los saldos de las cuentas. Véalas en "Cuentas del condominio".'
+        : 'La junta publicó los totales del condominio: cuánto entró y cuánto se gastó cada mes, el fondo de reserva y el avance de las cuotas especiales. Véalos en "Cuentas del condominio".',
+        { pantalla: 'finanzas' });
+    } else {
+      const junta = [...new Set(miembrosDemo.filter((m) => m.activo && JUNTA_ROLES.includes(m.rol)).map((m) => m.usuarioId))];
+      notificar(junta.filter((u) => u !== s.usuarioId), 'general', 'Cuentas del condominio',
+        'Se dejaron de mostrar las cuentas del condominio a los vecinos. Cada casa sigue viendo su propio estado de cuenta.');
+    }
+  },
   async fijarConvivencia(k) {
     exigirPresidencia();
     const antes = convivencia.morososPublicos;
-    Object.assign(convivencia, k);
+    Object.assign(convivencia, { morososPublicos: k.morososPublicos, morososMesesMin: k.morososMesesMin, mensajesAnonimos: k.mensajesAnonimos });
     if (antes === 'no' && k.morososPublicos !== 'no') {
       notificar(todosLosMiembros(), 'general', 'Lista de cuotas vencidas',
         `La junta publicará en la app las casas con ${k.morososMesesMin} o más ${k.morososMesesMin === 1 ? 'mes' : 'meses'} de cuotas vencidas`

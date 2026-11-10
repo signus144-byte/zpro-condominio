@@ -1,5 +1,15 @@
 # Historial de versiones · Vecinos ZPro
 
+## 0.9 · 10-nov-2026 · Datos para pagar y cuentas del condominio opcionales
+- **Datos para pagar** (Más → Datos para pagar): la junta carga cada cuenta por campos: banco (lista de los 26 bancos), teléfono de Pago Móvil, cédula o RIF, número de cuenta, titular, correo de Zelle y una nota. La app los limpia (acepta "0414-123.45.67", "+58 414…", "V-12.345.678") y rechaza lo que haría fallar el pago (teléfono fijo, cuenta que no empieza por el código del banco…).
+- **El vecino copia dato por dato**: en Pagar, según cómo va a pagar (Pago Móvil, transferencia, Zelle, efectivo), ve cada dato con su botón **Copiar** para pegarlo en la app de su banco: banco, teléfono, cédula o RIF (solo los números), número de cuenta y **monto ya calculado a la tasa BCV, escrito como lo piden los bancos (55467,33)**. Botón **Copiar todo**.
+- **QR de cobro del banco**: la junta sube la captura del QR que genera la app de su banco o le **toma una foto con la cámara** (por ejemplo, a la hoja impresa). La app lee el QR y lo guarda **nítido, con el mismo contenido**, y avisa si es de otro banco. El vecino lo ve en Pagar y lo guarda para abrirlo desde la app de su banco. También hay un QR con los datos en texto, que lee cualquier lector de QR.
+- **Contra el fraude**: cada cambio de los datos para pagar avisa a toda la junta (quién lo hizo y qué cambió). Si cambiaron en los últimos 7 días, el vecino lo ve en Pagar y se le sugiere confirmar con la junta.
+- Mensualidad de ZentaPro con los mismos botones Copiar.
+- **Cuentas del condominio para los vecinos, solo si la junta quiere** (Más → Transparencia y convivencia). **Por defecto no se muestra nada**: cada casa ve solo lo suyo. Presidencia o la administración puede publicar los **totales** (cobrado, gastado por categoría, fondo de reserva, avance de las cuotas especiales) o **todo el detalle** (además cada gasto con su factura y los saldos de las cuentas). Nunca se muestra qué casas pagaron. Al publicar se avisa a los vecinos; al dejar de publicar, solo a la junta.
+- Cambio: antes los vecinos veían siempre el avance de las cuotas especiales; ahora solo si la junta publica los números.
+- 177 pruebas de la API + reglas SQL, todas pasan.
+
 ## 0.8.1 · 10-nov-2026 · "Asistencia vecinal"
 - El botón de emergencia ahora se llama **Asistencia vecinal** en las dos apps: tarjeta de inicio, pantalla SOS, historial, inscripción, configuración de la junta, canal de notificaciones de Android, avisos y mensajes de error. Cada aviso individual sigue llamándose "alerta" ("Enviar alerta", "alerta activa").
 - Contrato de servicio: el mismo nombre.

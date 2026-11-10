@@ -6,11 +6,11 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { ConfigConvivencia, DenunciaAnonima, MensajeAnonimo, MorosoPublico, RespuestaAnonima } from '../../../compartido/tipos.js';
+import type { ConfigConvivencia, FinanzasPublicas, DenunciaAnonima, MensajeAnonimo, MorosoPublico, RespuestaAnonima } from '../../../compartido/tipos.js';
 import { bd, bdServicio, type Contexto } from '../contexto.js';
 import { guardarArchivo, leerFormulario, urlFirmada } from '../archivos/archivos.js';
 import { ErrorApi } from '../util/errores.js';
-import { ParamsC, Uuid } from './condominio.js';
+import { ParamsC, Periodo, Uuid } from './condominio.js';
 import { booleano, exigirJunta, exigirMiembro, iso, num } from './_comun.js';
 import { Categoria, MAX_FOTOS, limpiarFoto } from './reportes.js';
 
@@ -27,8 +27,9 @@ export default async function rutasConvivencia(app: FastifyInstance) {
     const { cid } = ParamsC.parse(req.params);
     return bd(req, async (c) => {
       await exigirMiembro(c, cid);
-      const k = (await c.query(`select morosos_publicos, morosos_meses_min, mensajes_anonimos from condominios where id = $1`, [cid])).rows[0];
-      return { morososPublicos: k.morosos_publicos, morososMesesMin: num(k.morosos_meses_min), mensajesAnonimos: k.mensajes_anonimos };
+      const k = (await c.query(`select morosos_publicos, morosos_meses_min, mensajes_anonimos, finanzas_publicas from condominios where id = $1`, [cid])).rows[0];
+      return { morososPublicos: k.morosos_publicos, morososMesesMin: num(k.morosos_meses_min), mensajesAnonimos: k.mensajes_anonimos,
+               finanzasPublicas: k.finanzas_publicas };
     });
   });
 
@@ -40,6 +41,32 @@ export default async function rutasConvivencia(app: FastifyInstance) {
     }).parse(req.body);
     await bd(req, (c) => c.query(`select fijar_convivencia($1, $2, $3::smallint, $4)`, [cid, d.morososPublicos, d.morososMesesMin, d.mensajesAnonimos]));
     return rep.status(204).send();
+  });
+
+  // ---------- Cuentas del condominio para los vecinos (v0.9, 0028): opcional, por defecto no se muestra nada ----------
+  app.put('/c/:cid/finanzas-publicas', async (req, rep) => {
+    const { cid } = ParamsC.parse(req.params);
+    const { modo } = z.object({ modo: z.enum(['no', 'totales', 'detalle']) }).parse(req.body);
+    await bd(req, (c) => c.query(`select fijar_finanzas_publicas($1, $2)`, [cid, modo]));
+    return rep.status(204).send();
+  });
+  // null = el condominio no publica sus números (los vecinos no ven nada). La junta siempre recibe la vista previa.
+  app.get('/c/:cid/finanzas-publicas', async (req): Promise<FinanzasPublicas | null> => {
+    const { cid } = ParamsC.parse(req.params);
+    const { periodo } = z.object({ periodo: Periodo }).parse(req.query);
+    const r = await bd(req, (c) => c.query(`select finanzas_publicas($1, $2::date) as d`, [cid, periodo]));
+    const d = r.rows[0].d;
+    if (!d) return null;
+    const n = (x: unknown) => num(x as string);
+    return {
+      modo: d.modo, periodo: String(d.periodo).slice(0, 10), cerrado: d.cerrado,
+      cobradoUsd: n(d.cobradoUsd), facturadoUsd: n(d.facturadoUsd), gastosUsd: n(d.gastosUsd),
+      gastosPorCategoria: (d.gastosPorCategoria ?? []).map((g: any) => ({ categoria: g.categoria, montoUsd: n(g.montoUsd) })),
+      fondoReservaUsd: n(d.fondoReservaUsd),
+      partidas: (d.partidas ?? []).map((p: any) => ({ titulo: p.titulo, presupuestoUsd: n(p.presupuestoUsd), emitidoUsd: n(p.emitidoUsd),
+                                                     cobradoUsd: n(p.cobradoUsd), estado: p.estado })),
+      cuentas: d.cuentas ? d.cuentas.map((c: any) => ({ nombre: c.nombre, moneda: c.moneda, saldoFinal: n(c.saldoFinal) })) : null,
+    };
   });
 
   // ---------- Casas con cuotas vencidas ----------

@@ -108,8 +108,9 @@ describe('panel y gastos', () => {
     assert.ok(p.json.saldosCuentas.length >= 4);
   });
 
-  it('gastos: todos los miembros ven la relación; solo finanzas registra (Bs con tasa, con factura)', async () => {
-    assert.equal((await P.pedir('GET', `c/${C}/gastos?periodo=2026-10-01`, b33.acceso)).json.length, 4);
+  it('gastos: la junta ve la relación (los vecinos, solo si el condominio la publica: 0028); solo finanzas registra', async () => {
+    assert.equal((await P.pedir('GET', `c/${C}/gastos?periodo=2026-10-01`, teso.acceso)).json.length, 4);
+    assert.equal((await P.pedir('GET', `c/${C}/gastos?periodo=2026-10-01`, b33.acceso)).json.length, 0, 'por defecto no se publica');
     assert.equal((await P.pedir('GET', `c/${C}/gastos?periodo=octubre`, b33.acceso)).status, 400);
     const f = formulario({ periodo: '2026-11-01', categoria: 'Agua', descripcion: 'Hidrocentro noviembre', moneda: 'VES', monto: '4310', tasaBcv: '215.5' },
       [{ campo: 'factura', nombre: 'factura.png', mime: 'image/png', datos: PNG }]);
@@ -117,9 +118,9 @@ describe('panel y gastos', () => {
     const f2 = formulario({ periodo: '2026-11-01', categoria: 'Agua', descripcion: 'Hidrocentro noviembre', moneda: 'VES', monto: '4310', tasaBcv: '215.5' },
       [{ campo: 'factura', nombre: 'factura.png', mime: 'image/png', datos: PNG }]);
     assert.equal((await P.pedir('POST', `c/${C}/gastos`, teso.acceso, f2)).status, 201);
-    const g = (await P.pedir('GET', `c/${C}/gastos?periodo=2026-11-01`, b34.acceso)).json[0];
+    const g = (await P.pedir('GET', `c/${C}/gastos?periodo=2026-11-01`, pres.acceso)).json[0];
     assert.equal(g.montoUsd, 20);
-    assert.equal((await P.pedir('GET', g.facturaUrl.replace('http://prueba', ''))).status, 200, 'los vecinos ven la factura');
+    assert.equal((await P.pedir('GET', g.facturaUrl.replace('http://prueba', ''))).status, 200, 'la junta ve la factura');
     const sinTasa = formulario({ periodo: '2026-11-01', categoria: 'Agua', descripcion: 'x', moneda: 'VES', monto: '10' });
     assert.equal((await P.pedir('POST', `c/${C}/gastos`, teso.acceso, sinTasa)).status, 400);
   });

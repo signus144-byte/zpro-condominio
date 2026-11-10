@@ -11,7 +11,7 @@ import type {
   AlertaVecinal, CercaniaUnidad, ConfigAlerta, EnlaceInvitacion, InfoInvitacion, ParticipanteAlerta,
   Difusion, GrupoUnidades, PreviaDifusion, UnidadAlcance,
   CierreMes, CobroPartidaCasa, LecturaTasa, ReporteDelMes, ResultadoConfirmarTasa, TasaBcv,
-  ConfigConvivencia, DenunciaAnonima, MensajeAnonimo, MorosoPublico,
+  ConfigConvivencia, DenunciaAnonima, MensajeAnonimo, MorosoPublico, FinanzasPublicas,
 } from './tipos';
 
 const JUNTA: Rol[] = ['presidente', 'tesorero', 'vocal', 'administrador'];
@@ -419,6 +419,8 @@ export function crearApiServidor(base: string): Api {
     // ---- Transparencia y convivencia (v0.8) ----
     convivencia: () => pedir<ConfigConvivencia>('GET', c('/convivencia')),
     async fijarConvivencia(k) { await pedir('PUT', c('/convivencia'), { ...k }); },
+    finanzasPublicas: (periodo) => pedir<FinanzasPublicas | null>('GET', c(`/finanzas-publicas?periodo=${periodo}`)),
+    async fijarFinanzasPublicas(modo) { await pedir('PUT', c('/finanzas-publicas'), { modo }); },
     morosos: (vistaPrevia) => pedir<MorosoPublico[]>('GET', c(`/morosos${vistaPrevia ? '?vistaPrevia=1' : ''}`)),
     mensajesAnonimos: () => pedir<MensajeAnonimo[]>('GET', c('/anonimos')),
     enviarMensajeAnonimo: (m) => pedir<{ id: string; reporteId: string | null }>('POST', c('/anonimos'), formulario({

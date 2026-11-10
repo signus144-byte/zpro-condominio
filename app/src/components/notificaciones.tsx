@@ -39,6 +39,7 @@ export function destinoNotificacion(n: Notificacion, prefijo: string): string {
     case 'anonimos': return s?.unidadId && SABOR !== 'admin' ? `/r/anonimos${n.datos.mensajeId ? `?m=${n.datos.mensajeId}` : ''}` : prefijo;
     case 'denuncias': return s?.esJunta && SABOR !== 'miembros' ? '/p/convivencia#denuncias' : prefijo;
     case 'morosos': return s?.unidadId && SABOR !== 'admin' ? '/r/morosos' : s?.esJunta ? '/p/convivencia' : prefijo;
+    case 'finanzas': return s?.unidadId && SABOR !== 'admin' ? '/r/finanzas' : s?.esJunta ? '/p/convivencia' : prefijo;
     case 'datos-pago': return s?.esJunta && SABOR !== 'miembros' ? '/p/datos-pago' : prefijo;
     default: return prefijo;
   }
