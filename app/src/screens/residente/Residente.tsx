@@ -4,6 +4,9 @@ import { api, type Cargo, type EstadoCuenta, type MetodoPago, type Moneda } from
 import { Campo, Cifra, Estado, Etiqueta, Tarjeta, Vacio, useCarga } from '../../components/ui';
 import { BloqueoTasa, LineaTasa, useTasaDelDia } from '../../components/tasa';
 import { DatosParaPagar, sirvePara } from '../../components/DatosParaPagar';
+import { CapturaComprobante, ResumenLectura } from '../../components/Comprobante';
+import { comprobarDestino, type LecturaComprobante } from '../../comprobante/interpretar';
+import { nombreBanco } from '../../bancos';
 import { ESTADO_PAGO, METODOS, TIPO_CARGO, bs, fecha, hoyLocal, mes, usd } from '../../formato';
 import { BotonSOS } from '../alerta/Alerta';
 
@@ -302,6 +305,8 @@ function FormPago({ grupos, cargoIds, totalUsd, alCambiar }: { grupos: GrupoDeud
   const [banco, setBanco] = useState('');
   const [cuentaDestino, setCuentaDestino] = useState('');
   const [comprobante, setComprobante] = useState<File | null>(null);
+  const [lectura, setLectura] = useState<LecturaComprobante | null>(null);
+  const [leidos, setLeidos] = useState<Set<string>>(new Set());   // campos llenados con la captura
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const necesitaRef = !['efectivo_usd', 'efectivo_bs'].includes(metodo);
@@ -316,6 +321,26 @@ function FormPago({ grupos, cargoIds, totalUsd, alCambiar }: { grupos: GrupoDeud
   const montoN = Number(monto.replace(/\./g, '').replace(',', '.'));
   const equivUsd = moneda === 'USD' ? montoN : tasa.usdVes ? r2(montoN / tasa.usdVes) : null;
   const bloqueado = moneda === 'VES' && !tasa.usdVes;
+  const cuentaElegida = destinos.find((c) => c.id === cuentaDestino) ?? destinos[0];
+  const ve = (n: number) => n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Llena el formulario con lo que se leyó de la captura (la persona lo revisa y puede corregirlo).
+  function aplicarLectura(l: LecturaComprobante | null) {
+    setLectura(l);
+    if (!l) { setLeidos(new Set()); return; }
+    const k = new Set<string>();
+    if (l.monto != null) { setMonto(ve(l.monto)); setTocado(true); k.add('monto'); }
+    if (l.referencia) { setReferencia(l.referencia); k.add('referencia'); }
+    if (l.fecha && l.fecha <= hoyLocal()) { setFechaPago(l.fecha); k.add('fecha'); }
+    if (l.bancoOrigen) { setBanco(nombreBanco(l.bancoOrigen)); k.add('banco'); }
+    // Una transferencia a la cuenta de 20 dígitos (y no a un teléfono) se reporta como transferencia.
+    if (metodo === 'pago_movil' && l.cuentas.length && !l.telefonos.length) setMetodo('transferencia');
+    // Si el comprobante muestra otra de las cuentas del condominio, se elige esa.
+    const otra = destinos.find((c) => comprobarDestino(l, c).coincide.some((x) => x === 'teléfono' || x === 'número de cuenta'));
+    if (otra) setCuentaDestino(otra.id);
+    setLeidos(k);
+  }
+  const ayudaLeido = (campo: string, texto?: string) => (leidos.has(campo) ? `Leído del comprobante. ${texto ?? ''}`.trim() : texto);
 
   async function enviar(ev: React.FormEvent) {
     ev.preventDefault();
@@ -384,26 +409,29 @@ function FormPago({ grupos, cargoIds, totalUsd, alCambiar }: { grupos: GrupoDeud
         </Estado>
       </Tarjeta>
 
-      {!bloqueado && (
         <Tarjeta titulo="Después de pagar, repórtelo">
+          <CapturaComprobante archivo={comprobante} alElegir={setComprobante} alLeer={aplicarLectura} moneda={moneda} />
+          {lectura && <ResumenLectura l={lectura} cuenta={cuentaElegida} moneda={moneda} />}
+          <strong className="paso-form">{comprobante ? '2. Revise los datos' : '2. O escriba los datos'}</strong>
           <Campo etiqueta={`Monto que pagó en ${moneda === 'USD' ? 'dólares' : 'bolívares'}`}
-                 ayuda={equivUsd != null && montoN > 0 && totalUsd > 0
+                 ayuda={ayudaLeido('monto', equivUsd != null && montoN > 0 && totalUsd > 0
                    ? (equivUsd < totalUsd - 0.009 ? `Equivale a ${usd(equivUsd)}: es un abono; quedará pendiente ${usd(r2(totalUsd - equivUsd))}.`
                       : equivUsd > totalUsd + 0.009 ? `Equivale a ${usd(equivUsd)}: lo que sobra (${usd(r2(equivUsd - totalUsd))}) se descuenta de su deuda más antigua o queda a favor.`
                       : `Equivale a ${usd(equivUsd)}: cubre exactamente lo elegido.`)
-                   : undefined}>
+                   : undefined)}>
             <input inputMode="decimal" value={monto} onChange={(e) => { setMonto(e.target.value); setTocado(true); }} placeholder="0,00" required />
           </Campo>
-          <Campo etiqueta="Fecha del pago" ayuda={moneda === 'VES' ? 'Se usa la tasa BCV de esa fecha.' : undefined}>
-            <input type="date" value={fechaPago} max={hoyLocal()} onChange={(e) => { setFechaPago(e.target.value); setTocado(false); }} />
+          <Campo etiqueta="Fecha del pago" ayuda={ayudaLeido('fecha', moneda === 'VES' ? 'Se usa la tasa BCV de esa fecha.' : undefined)}>
+            <input type="date" value={fechaPago} max={hoyLocal()} onChange={(e) => { setFechaPago(e.target.value); if (!leidos.has('monto')) setTocado(false); }} />
           </Campo>
+          {bloqueado && <BloqueoTasa t={tasa} />}
           {necesitaRef && (
-            <Campo etiqueta="Número de referencia" ayuda="Los últimos dígitos que aparecen en su comprobante">
+            <Campo etiqueta="Número de referencia" ayuda={ayudaLeido('referencia', 'Los últimos dígitos que aparecen en su comprobante')}>
               <input value={referencia} onChange={(e) => setReferencia(e.target.value)} inputMode="numeric" />
             </Campo>
           )}
           {moneda === 'VES' && metodo !== 'efectivo_bs' && (
-            <Campo etiqueta="Banco de origen"><input value={banco} onChange={(e) => setBanco(e.target.value)} placeholder="Banesco, Venezuela, Mercantil…" /></Campo>
+            <Campo etiqueta="Banco de origen" ayuda={ayudaLeido('banco')}><input value={banco} onChange={(e) => setBanco(e.target.value)} placeholder="Banesco, Venezuela, Mercantil…" /></Campo>
           )}
           {destinos.length > 1 && (
             <Campo etiqueta="¿A qué cuenta pagó?">
@@ -412,11 +440,7 @@ function FormPago({ grupos, cargoIds, totalUsd, alCambiar }: { grupos: GrupoDeud
               </select>
             </Campo>
           )}
-          <Campo etiqueta="Captura del comprobante (opcional)">
-            <input type="file" accept="image/*" capture="environment" onChange={(e) => setComprobante(e.target.files?.[0] ?? null)} />
-          </Campo>
         </Tarjeta>
-      )}
       {error && <div className="aviso aviso-error">{error}</div>}
       <button className="btn btn-ancho" disabled={enviando || bloqueado}>{enviando ? 'Enviando…' : 'Enviar a la junta'}</button>
       <p className="nota">Su pago queda <strong>en revisión</strong> hasta que la junta lo verifique en el banco. Al aprobarlo se descuenta de lo que eligió y le avisamos.</p>

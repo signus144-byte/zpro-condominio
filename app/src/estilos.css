@@ -331,3 +331,14 @@ button.acceso { border: none; text-align: left; font: inherit; cursor: pointer; 
 .qr-pago code { overflow-wrap: anywhere; font-size: 0.8rem; }
 .nota-alerta { color: var(--alerta); background: var(--alerta-suave); border-radius: 8px; padding: 6px 10px; }
 .qr-banco { border-top: 1px solid var(--linea); padding-top: 12px; margin-top: 4px; display: flex; flex-direction: column; gap: 8px; }
+
+/* v0.10 · Captura del comprobante con lectura automática */
+.captura-comprobante { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--linea); margin-bottom: 4px; }
+.captura-fila { display: flex; align-items: center; gap: 10px; }
+.captura-fila img { width: 52px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--linea); flex: none; }
+.captura-fila span { flex: 1; min-width: 0; overflow-wrap: anywhere; display: flex; flex-direction: column; font-size: 0.9rem; }
+.captura-fila small { color: var(--primario); font-weight: 600; }
+.captura-pdf { width: 52px; height: 72px; border-radius: 8px; background: var(--primario-suave); color: var(--primario); display: grid; place-items: center; font-weight: 700; flex: none; }
+.lectura { display: flex; flex-direction: column; gap: 6px; }
+.paso-form { margin-top: 6px; }
+.revision-comprobante { list-style: none; margin: 4px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--fondo); display: flex; flex-direction: column; gap: 3px; font-size: 0.86rem; }

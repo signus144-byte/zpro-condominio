@@ -6,6 +6,8 @@ import { LineaTasa, useTasaDelDia } from '../../components/tasa';
 import { ESTADO_PAGO, METODOS, TIPO_CARGO, bs, fecha, mes, mesAnterior, mesSiguiente, monto, periodoActual, usd } from '../../formato';
 import { BotonSOS } from '../alerta/Alerta';
 import { EtiquetaCargo } from '../residente/Residente';
+import { RevisarComprobante } from '../../components/Comprobante';
+import type { CuentaFinanciera } from '../../data';
 
 // ---------------- Panel (columna financiera) ----------------
 export function Panel() {
@@ -69,6 +71,7 @@ export function PagosPresidencia() {
   const [periodo, setPeriodo] = useState(periodoActual());
   const { datos, cargando, error, recargar } = useCarga(() => api.pagos(filtro, filtro === 'todos' ? periodo : undefined), [filtro, periodo]);
   useEffect(() => api.suscribirNotificaciones((n) => { if (n.tipo === 'pago_reportado') recargar(); }), [recargar]);
+  const cuentas = useCarga(() => api.cuentasFinancieras());
 
   return (
     <>
@@ -84,14 +87,14 @@ export function PagosPresidencia() {
         </div>
       )}
       <Estado cargando={cargando} error={error}>
-        {datos?.length ? datos.map((p) => <TarjetaPago key={p.id} p={p} alCambiar={recargar} />)
+        {datos?.length ? datos.map((p) => <TarjetaPago key={p.id} p={p} alCambiar={recargar} cuentas={cuentas.datos ?? []} />)
           : <Vacio>{filtro === 'reportado' ? 'No hay pagos por revisar. 🎉' : `Sin pagos en ${mes(periodo).toLowerCase()}.`}</Vacio>}
       </Estado>
     </>
   );
 }
 
-function TarjetaPago({ p, alCambiar }: { p: Pago; alCambiar: () => void }) {
+function TarjetaPago({ p, alCambiar, cuentas }: { p: Pago; alCambiar: () => void; cuentas: CuentaFinanciera[] }) {
   const [modo, setModo] = useState<'nada' | 'rechazar' | 'asignar'>('nada');
   const [motivo, setMotivo] = useState('');
   const [deudas, setDeudas] = useState<Cargo[] | null>(null);
@@ -144,6 +147,9 @@ function TarjetaPago({ p, alCambiar }: { p: Pago; alCambiar: () => void }) {
         <small className="aplicado">Se descontó de: {p.aplicaciones.map((a) => `${a.concepto} (${usd(a.montoUsd)})`).join(', ')}</small>
       )}
       {p.comprobanteUrl && <a className="btn-texto" href={p.comprobanteUrl} target="_blank" rel="noreferrer">Ver comprobante</a>}
+      {p.comprobanteUrl && p.estado === 'reportado' && (
+        <RevisarComprobante url={p.comprobanteUrl} referencia={p.referencia} monto={p.monto} moneda={p.moneda} fechaPago={p.fechaPago} cuentas={cuentas} />
+      )}
       {p.motivoRechazo && <small className="txt-error">Rechazado: {p.motivoRechazo}</small>}
       {err && <div className="aviso aviso-error">{err}</div>}
       {p.estado === 'reportado' && modo === 'rechazar' && (
