@@ -5,6 +5,7 @@ Vecinos ZPro · instalar (o actualizar) el PILOTO en el servidor de los bots (VP
 Se ejecuta en la PC con el Python de Ani Trade (que ya trae paramiko), desde «INSTALAR EN SERVIDOR.bat»:
     "C:\\Trading Bot Ani\\.venv\\Scripts\\python.exe" desplegar_vecinos.py            → instalar / actualizar
     "C:\\Trading Bot Ani\\.venv\\Scripts\\python.exe" desplegar_vecinos.py --revisar  → solo mirar (no cambia nada)
+    "C:\\Trading Bot Ani\\.venv\\Scripts\\python.exe" desplegar_vecinos.py --nueva-clave → clave nueva para la consola
 
 1. DIAGNÓSTICO (solo lectura): memoria, disco, Docker, Caddy de Alabanza, bots y Vecinos ZPro si ya está.
 2. Pregunta antes de tocar nada. Si se confirma con S:
@@ -17,6 +18,8 @@ Deja «informe-servidor.txt» (sin claves) para que Claude lo revise.
 """
 import getpass
 import os
+import re
+import secrets
 import shlex
 import ssl
 import sys
@@ -42,6 +45,47 @@ APP = f"https://vecinos.{BASE}"
 CONSOLA = f"https://consola-vecinos.{BASE}"
 ENVS = [Path(r"C:\Trading Bot Ani\.env"), Path(r"C:\Trading Bot Ani\Ani Trade Real\.env")]
 INFORME = AQUI / "informe-servidor.txt"
+ARCHIVO_CLAVE = AQUI / "CLAVE-CONSOLA.txt"
+
+
+def guardar_clave(correo, clave):
+    """La clave se muestra Y se guarda en la PC (solo aquí), para que no se pierda si se cierra la ventana."""
+    ARCHIVO_CLAVE.write_text(
+        "Vecinos ZPro · clave de la consola\n\n"
+        f"Consola: {CONSOLA}\nCorreo:  {correo}\nClave:   {clave}\n\n"
+        "Cámbiela después de entrar y BORRE este archivo. No lo envíe por WhatsApp.\n", encoding="utf-8")
+
+
+HASH_EN_CONTENEDOR = ("docker exec -i vecinos-servidor node -e \"let d='';process.stdin.on('data',c=>d+=c).on('end',async()=>{"
+                      "const {hash}=await import('@node-rs/argon2');process.stdout.write(await hash(d.trim()))})\"")
+
+
+def nueva_clave(cli):
+    correo = input("Correo de la cuenta de la consola: ").strip().lower()
+    if not re.fullmatch(r"[^\s@'\"\\]+@[^\s@'\"\\]+\.[^\s@'\"\\]+", correo):
+        sys.exit("❌ Ese correo no es válido.")
+    clave = "".join(secrets.choice("ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789") for _ in range(14))
+    # La clave viaja por la entrada estándar (no queda en la línea de comandos del servidor).
+    entrada, salida, _ = cli.exec_command(f"bash -lc {shlex.quote(HASH_EN_CONTENEDOR)} 2>&1", timeout=120)
+    entrada.write(clave); entrada.channel.shutdown_write()
+    h = salida.read().decode().strip()
+    if salida.channel.recv_exit_status() != 0 or not h.startswith("$argon2"):
+        sys.exit("❌ No se pudo preparar la clave en el servidor: " + h[:200])
+    sql = (f"update auth.users set clave_hash = '{h}' where email = '{correo}' returning id;")
+    cod, res = ejecutar(cli, f"docker exec -i vecinos-db psql -U postgres -d zpro -v ON_ERROR_STOP=1 -At -c {shlex.quote(sql)}", mostrar=False)
+    uid = res.strip().splitlines()[0] if res.strip() else ""
+    if cod != 0 or not re.fullmatch(r"[0-9a-f-]{36}", uid):
+        sys.exit(f"❌ No hay ninguna cuenta con el correo {correo} en el servidor (o no se pudo cambiar).")
+    sql2 = (f"insert into plataforma_admins (usuario_id, rol) values ('{uid}', 'dueno') "
+            "on conflict (usuario_id) do update set rol = 'dueno', activo = true;")
+    ejecutar(cli, f"docker exec -i vecinos-db psql -U postgres -d zpro -v ON_ERROR_STOP=1 -At -c {shlex.quote(sql2)}", mostrar=False)
+    guardar_clave(correo, clave)
+    print("\n" + "-" * 66)
+    print(f"   Consola:  {CONSOLA}")
+    print(f"   Correo:   {correo}")
+    print(f"   🔑 Clave nueva:  {clave}")
+    print(f"\n   También quedó guardada en {ARCHIVO_CLAVE.name}, en esta carpeta. Bórrela después de entrar.")
+    print("-" * 66)
 
 
 def leer_password():
@@ -120,6 +164,12 @@ def conectar():
 
 
 def main():
+    if "--nueva-clave" in sys.argv:
+        print("=" * 66 + "\n  Vecinos ZPro · clave nueva para la consola\n" + "=" * 66)
+        cli = conectar()
+        nueva_clave(cli)
+        cli.close()
+        return
     revisar = "--revisar" in sys.argv
     print("=" * 66)
     print("  Vecinos ZPro · " + ("revisar el servidor del piloto" if revisar else "piloto en el servidor de los bots"))
@@ -198,8 +248,9 @@ def main():
     print(f"   App (vecinos):  {APP}")
     print(f"   Consola:        {CONSOLA}")
     if clave:
+        guardar_clave(correo, clave)
         print(f"\n   🔑 Clave de la consola para {correo}:   {clave}")
-        print("      Anótala ahora: no se vuelve a mostrar. Puedes cambiarla después desde la app.")
+        print(f"      También quedó guardada en {ARCHIVO_CLAVE.name}, en esta carpeta. Bórrela después de entrar.")
     elif correo:
         print(f"\n   👤 {correo} ya tenía cuenta: ahora es dueño de la consola (su clave no cambió).")
     print("-" * 66)

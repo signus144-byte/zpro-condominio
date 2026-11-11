@@ -31,3 +31,6 @@ app/android/app/src/miembros/assets/
 releases/
 /archivos/
 servidor/datos/
+
+# Clave de la consola que deja el instalador del piloto en la PC
+CLAVE-CONSOLA.txt
